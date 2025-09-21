@@ -1,201 +1,151 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { TasksState, Task, TaskListRequest, UpdateTaskStatusRequest } from '../../types';
-import { mockTasks, mockApiDelay, generateMockId } from '../../services/mockData';
+import { tasksService, Task, TasksResponse } from '../../services/tasksService';
+
+export interface TasksState {
+  tasks: Task[];
+  isLoading: boolean;
+  error: string | null;
+  filter: 'all' | 'pending' | 'in_progress' | 'completed';
+  search: string;
+  pagination: {
+    current_page: number;
+    per_page: number;
+    total: number;
+    last_page: number;
+    has_more: boolean;
+  };
+  summary: {
+    pending: number;
+    in_progress: number;
+    completed: number;
+  };
+}
 
 // Async thunks
 export const fetchTasks = createAsyncThunk(
   'tasks/fetchTasks',
-  async (params: TaskListRequest = {}, { rejectWithValue }) => {
+  async (params: {
+    status?: 'all' | 'pending' | 'in_progress' | 'completed';
+    search?: string;
+    per_page?: number;
+  } = {}, { rejectWithValue }) => {
     try {
-      // MOCK FETCH TASKS - Bypass API call
-      await mockApiDelay(800);
+      const response = await tasksService.getTasks(params);
       
-      let filteredTasks = [...mockTasks];
-      
-      // Apply filters
-      if (params.status) {
-        filteredTasks = filteredTasks.filter(task => task.status === params.status);
+      if (!response.success) {
+        return rejectWithValue(response.message);
       }
       
-      if (params.dateFrom || params.dateTo) {
-        // For demo, just return all tasks
-        // In real implementation, filter by date
-      }
-      
-      // Apply pagination
-      const page = params.page || 1;
-      const limit = params.limit || 20;
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      
-      return filteredTasks.slice(startIndex, endIndex);
+      return response;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch tasks');
     }
   }
 );
 
-export const fetchTaskById = createAsyncThunk(
-  'tasks/fetchTaskById',
-  async (taskId: string, { rejectWithValue }) => {
+export const fetchTaskDetails = createAsyncThunk(
+  'tasks/fetchTaskDetails',
+  async (taskId: number, { rejectWithValue }) => {
     try {
-      // MOCK FETCH TASK BY ID - Bypass API call
-      await mockApiDelay(500);
+      const response = await tasksService.getTaskDetails(taskId);
       
-      const task = mockTasks.find(t => t.id === taskId);
-      if (!task) {
-        throw new Error('Task not found');
+      if (!response.success) {
+        return rejectWithValue(response.message);
       }
       
-      return task;
+      return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to fetch task');
-    }
-  }
-);
-
-export const updateTaskStatus = createAsyncThunk(
-  'tasks/updateTaskStatus',
-  async (request: UpdateTaskStatusRequest, { rejectWithValue }) => {
-    try {
-      // MOCK UPDATE TASK STATUS - Bypass API call
-      await mockApiDelay(600);
-      
-      const task = mockTasks.find(t => t.id === request.taskId);
-      if (!task) {
-        throw new Error('Task not found');
-      }
-      
-      // Update task status
-      const updatedTask = {
-        ...task,
-        status: request.status,
-        notes: request.notes || task.notes,
-        updatedAt: new Date().toISOString()
-      };
-      
-      return updatedTask;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to update task status');
+      return rejectWithValue(error.message || 'Failed to fetch task details');
     }
   }
 );
 
 export const acceptTask = createAsyncThunk(
   'tasks/acceptTask',
-  async (taskId: string, { rejectWithValue }) => {
+  async (taskId: number, { rejectWithValue, dispatch }) => {
     try {
-      // MOCK ACCEPT TASK - Bypass API call
-      await mockApiDelay(500);
+      const response = await tasksService.acceptTask(taskId);
       
-      const task = mockTasks.find(t => t.id === taskId);
-      if (!task) {
-        throw new Error('Task not found');
+      if (!response.success) {
+        return rejectWithValue(response.message);
       }
       
-      return {
-        ...task,
-        status: 'in-progress' as const,
-        updatedAt: new Date().toISOString()
-      };
+      // Refresh tasks after accepting
+      dispatch(fetchTasks({}));
+      
+      return response.data;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to accept task');
     }
   }
 );
 
-export const startTask = createAsyncThunk(
-  'tasks/startTask',
-  async (
-    { taskId, location }: { taskId: string; location?: { latitude: number; longitude: number } },
-    { rejectWithValue }
-  ) => {
+export const rejectTask = createAsyncThunk(
+  'tasks/rejectTask',
+  async ({ taskId, reason }: { taskId: number; reason: string }, { rejectWithValue, dispatch }) => {
     try {
-      // MOCK START TASK - Bypass API call
-      await mockApiDelay(500);
+      const response = await tasksService.rejectTask(taskId, reason);
       
-      const task = mockTasks.find(t => t.id === taskId);
-      if (!task) {
-        throw new Error('Task not found');
+      if (!response.success) {
+        return rejectWithValue(response.message);
       }
       
-      return {
-        ...task,
-        status: 'in-progress' as const,
-        updatedAt: new Date().toISOString()
-      };
+      // Refresh tasks after rejecting
+      dispatch(fetchTasks({}));
+      
+      return { taskId, message: response.message };
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to start task');
+      return rejectWithValue(error.message || 'Failed to reject task');
     }
   }
 );
 
-export const completeTask = createAsyncThunk(
-  'tasks/completeTask',
-  async (
-    { taskId, notes, location }: { 
-      taskId: string; 
-      notes?: string; 
-      location?: { latitude: number; longitude: number } 
-    },
-    { rejectWithValue }
-  ) => {
+export const updateTaskStatus = createAsyncThunk(
+  'tasks/updateTaskStatus',
+  async ({ taskId, status, notes, location }: {
+    taskId: number;
+    status: string;
+    notes?: string;
+    location?: { latitude: number; longitude: number };
+  }, { rejectWithValue, dispatch }) => {
     try {
-      // MOCK COMPLETE TASK - Bypass API call
-      await mockApiDelay(600);
+      const response = await tasksService.updateTaskStatus(taskId, {
+        status,
+        notes,
+        location,
+      });
       
-      const task = mockTasks.find(t => t.id === taskId);
-      if (!task) {
-        throw new Error('Task not found');
+      if (!response.success) {
+        return rejectWithValue(response.message);
       }
       
-      return {
-        ...task,
-        status: 'completed' as const,
-        notes: notes || task.notes,
-        updatedAt: new Date().toISOString()
-      };
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to complete task');
-    }
-  }
-);
-
-export const cancelTask = createAsyncThunk(
-  'tasks/cancelTask',
-  async ({ taskId, reason }: { taskId: string; reason: string }, { rejectWithValue }) => {
-    try {
-      // MOCK CANCEL TASK - Bypass API call
-      await mockApiDelay(500);
+      // Refresh tasks after status update
+      dispatch(fetchTasks({}));
       
-      const task = mockTasks.find(t => t.id === taskId);
-      if (!task) {
-        throw new Error('Task not found');
-      }
-      
-      return {
-        ...task,
-        status: 'cancelled' as const,
-        notes: `Cancelled: ${reason}`,
-        updatedAt: new Date().toISOString()
-      };
+      return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to cancel task');
+      return rejectWithValue(error.message || 'Failed to update task status');
     }
   }
 );
 
 const initialState: TasksState = {
   tasks: [],
-  activeTask: null,
   isLoading: false,
   error: null,
-  filters: {
-    status: 'all',
-    dateRange: {
-      start: new Date().toISOString().split('T')[0],
-      end: new Date().toISOString().split('T')[0],
-    },
+  filter: 'all',
+  search: '',
+  pagination: {
+    current_page: 1,
+    per_page: 15,
+    total: 0,
+    last_page: 1,
+    has_more: false,
+  },
+  summary: {
+    pending: 0,
+    in_progress: 0,
+    completed: 0,
   },
 };
 
@@ -206,32 +156,15 @@ const tasksSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
-    setActiveTask: (state, action: PayloadAction<Task | null>) => {
-      state.activeTask = action.payload;
+    setFilter: (state, action: PayloadAction<'all' | 'pending' | 'in_progress' | 'completed'>) => {
+      state.filter = action.payload;
     },
-    updateFilters: (state, action: PayloadAction<Partial<TasksState['filters']>>) => {
-      state.filters = { ...state.filters, ...action.payload };
+    setSearch: (state, action: PayloadAction<string>) => {
+      state.search = action.payload;
     },
-    setLoading: (state, action: PayloadAction<boolean>) => {
-      state.isLoading = action.payload;
-    },
-    updateTaskInList: (state, action: PayloadAction<Task>) => {
-      const index = state.tasks.findIndex(task => task.id === action.payload.id);
-      if (index !== -1) {
-        state.tasks[index] = action.payload;
-      }
-      if (state.activeTask?.id === action.payload.id) {
-        state.activeTask = action.payload;
-      }
-    },
-    addTask: (state, action: PayloadAction<Task>) => {
-      state.tasks.unshift(action.payload);
-    },
-    removeTask: (state, action: PayloadAction<string>) => {
-      state.tasks = state.tasks.filter(task => task.id !== action.payload);
-      if (state.activeTask?.id === action.payload) {
-        state.activeTask = null;
-      }
+    clearTasks: (state) => {
+      state.tasks = [];
+      state.error = null;
     },
   },
   extraReducers: (builder) => {
@@ -243,7 +176,20 @@ const tasksSlice = createSlice({
       })
       .addCase(fetchTasks.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.tasks = action.payload;
+        if (action.payload.data) {
+          state.tasks = action.payload.data.tasks;
+          state.pagination = {
+            ...action.payload.data.pagination,
+            has_more: action.payload.data.pagination.current_page < action.payload.data.pagination.last_page
+          };
+          
+          // Calculate summary from tasks
+          state.summary = {
+            pending: action.payload.data.tasks.filter(t => t.status === 'pending').length,
+            in_progress: action.payload.data.tasks.filter(t => t.status === 'in_progress').length,
+            completed: action.payload.data.tasks.filter(t => t.status === 'delivered').length,
+          };
+        }
         state.error = null;
       })
       .addCase(fetchTasks.rejected, (state, action) => {
@@ -251,18 +197,54 @@ const tasksSlice = createSlice({
         state.error = action.payload as string;
       });
 
-    // Fetch Task by ID
+    // Fetch Task Details
     builder
-      .addCase(fetchTaskById.pending, (state) => {
+      .addCase(fetchTaskDetails.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(fetchTaskById.fulfilled, (state, action) => {
+      .addCase(fetchTaskDetails.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.activeTask = action.payload;
+        if (action.payload) {
+          // Update the task in the list with detailed info
+          const taskIndex = state.tasks.findIndex(task => task.id === action.payload!.id);
+          if (taskIndex !== -1) {
+            state.tasks[taskIndex] = action.payload;
+          }
+        }
         state.error = null;
       })
-      .addCase(fetchTaskById.rejected, (state, action) => {
+      .addCase(fetchTaskDetails.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
+    // Accept Task
+    builder
+      .addCase(acceptTask.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(acceptTask.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(acceptTask.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      });
+
+    // Reject Task
+    builder
+      .addCase(rejectTask.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(rejectTask.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(rejectTask.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       });
@@ -275,76 +257,14 @@ const tasksSlice = createSlice({
       })
       .addCase(updateTaskStatus.fulfilled, (state, action) => {
         state.isLoading = false;
-        const index = state.tasks.findIndex(task => task.id === action.payload.id);
-        if (index !== -1) {
-          state.tasks[index] = action.payload;
-        }
-        if (state.activeTask?.id === action.payload.id) {
-          state.activeTask = action.payload;
-        }
         state.error = null;
       })
       .addCase(updateTaskStatus.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       });
-
-    // Accept Task
-    builder
-      .addCase(acceptTask.fulfilled, (state, action) => {
-        const index = state.tasks.findIndex(task => task.id === action.payload.id);
-        if (index !== -1) {
-          state.tasks[index] = action.payload;
-        }
-        if (state.activeTask?.id === action.payload.id) {
-          state.activeTask = action.payload;
-        }
-      });
-
-    // Start Task
-    builder
-      .addCase(startTask.fulfilled, (state, action) => {
-        const index = state.tasks.findIndex(task => task.id === action.payload.id);
-        if (index !== -1) {
-          state.tasks[index] = action.payload;
-        }
-        state.activeTask = action.payload;
-      });
-
-    // Complete Task
-    builder
-      .addCase(completeTask.fulfilled, (state, action) => {
-        const index = state.tasks.findIndex(task => task.id === action.payload.id);
-        if (index !== -1) {
-          state.tasks[index] = action.payload;
-        }
-        if (state.activeTask?.id === action.payload.id) {
-          state.activeTask = null; // Clear active task when completed
-        }
-      });
-
-    // Cancel Task
-    builder
-      .addCase(cancelTask.fulfilled, (state, action) => {
-        const index = state.tasks.findIndex(task => task.id === action.payload.id);
-        if (index !== -1) {
-          state.tasks[index] = action.payload;
-        }
-        if (state.activeTask?.id === action.payload.id) {
-          state.activeTask = null; // Clear active task when cancelled
-        }
-      });
   },
 });
 
-export const {
-  clearError,
-  setActiveTask,
-  updateFilters,
-  setLoading,
-  updateTaskInList,
-  addTask,
-  removeTask,
-} = tasksSlice.actions;
-
+export const { clearError, setFilter, setSearch, clearTasks } = tasksSlice.actions;
 export default tasksSlice.reducer;

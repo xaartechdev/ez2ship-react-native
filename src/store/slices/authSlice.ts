@@ -1,46 +1,26 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { AuthState, User, LoginRequest, LoginResponse } from '../../types';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { mockApiDelay } from '../../services/mockData';
+import { authService, LoginCredentials, User } from '../../services/authService';
+
+export interface AuthState {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+}
 
 // Async thunks
 export const login = createAsyncThunk(
   'auth/login',
-  async (credentials: LoginRequest, { rejectWithValue }) => {
+  async (credentials: LoginCredentials, { rejectWithValue }) => {
     try {
-      // MOCK LOGIN - Bypass API call
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 1000)); // Simulate API delay
+      const response = await authService.login(credentials);
       
-      // Mock user data
-      const mockResponse: LoginResponse = {
-        user: {
-          id: '1',
-          email: credentials.email,
-          name: 'John Smith',
-          phone: '+1 (555) 123-4567',
-          profileImage: undefined,
-          driverLicense: 'DL123456789',
-          vehicleInfo: {
-            type: 'car',
-            model: 'Toyota Camry',
-            year: 2022,
-            plateNumber: 'ABC123',
-            color: 'White',
-            capacity: '5 passengers'
-          },
-          status: 'active',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        },
-        token: 'mock-jwt-token-12345',
-        refreshToken: 'mock-refresh-token-67890',
-        expiresIn: 3600
-      };
-
-      await AsyncStorage.setItem('token', mockResponse.token);
-      await AsyncStorage.setItem('refreshToken', mockResponse.refreshToken);
-      await AsyncStorage.setItem('user', JSON.stringify(mockResponse.user));
-      return mockResponse;
+      if (!response.success) {
+        return rejectWithValue(response.message);
+      }
+      
+      return response.data;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Login failed');
     }
@@ -51,39 +31,10 @@ export const logout = createAsyncThunk(
   'auth/logout',
   async (_, { rejectWithValue }) => {
     try {
-      // MOCK LOGOUT - Bypass API call
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 500)); // Simulate API delay
-      await AsyncStorage.multiRemove(['token', 'refreshToken', 'user']);
-      return null;
+      const response = await authService.logout();
+      return response;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Logout failed');
-    }
-  }
-);
-
-export const refreshToken = createAsyncThunk(
-  'auth/refreshToken',
-  async (_, { rejectWithValue }) => {
-    try {
-      // MOCK REFRESH TOKEN - Bypass API call
-      const refreshToken = await AsyncStorage.getItem('refreshToken');
-      if (!refreshToken) {
-        throw new Error('No refresh token available');
-      }
-      
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 500)); // Simulate API delay
-      
-      // Mock refresh response
-      const mockResponse = {
-        token: 'mock-new-jwt-token-' + Date.now(),
-        refreshToken: 'mock-new-refresh-token-' + Date.now(),
-        expiresIn: 3600
-      };
-      
-      await AsyncStorage.setItem('token', mockResponse.token);
-      return mockResponse;
-    } catch (error: any) {
-      return rejectWithValue(error.message || 'Token refresh failed');
     }
   }
 );
@@ -92,14 +43,19 @@ export const loadUserFromStorage = createAsyncThunk(
   'auth/loadUserFromStorage',
   async (_, { rejectWithValue }) => {
     try {
-      const token = await AsyncStorage.getItem('token');
-      const userString = await AsyncStorage.getItem('user');
+      const isAuthenticated = await authService.isAuthenticated();
       
-      if (!token || !userString) {
+      if (!isAuthenticated) {
         throw new Error('No stored authentication data');
       }
       
-      const user = JSON.parse(userString);
+      const token = await authService.getStoredToken();
+      const user = await authService.getStoredUser();
+      
+      if (!token || !user) {
+        throw new Error('Incomplete authentication data');
+      }
+      
       return { token, user };
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to load user data');
@@ -107,10 +63,28 @@ export const loadUserFromStorage = createAsyncThunk(
   }
 );
 
+export const checkAuthStatus = createAsyncThunk(
+  'auth/checkAuthStatus',
+  async (_, { rejectWithValue }) => {
+    try {
+      const isAuthenticated = await authService.isAuthenticated();
+      
+      if (isAuthenticated) {
+        const token = await authService.getStoredToken();
+        const user = await authService.getStoredUser();
+        return { token, user };
+      }
+      
+      return null;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to check auth status');
+    }
+  }
+);
+
 const initialState: AuthState = {
   user: null,
   token: null,
-  refreshToken: null,
   isAuthenticated: false,
   isLoading: false,
   error: null,
@@ -141,10 +115,11 @@ const authSlice = createSlice({
       })
       .addCase(login.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.user = action.payload.user;
-        state.token = action.payload.token;
-        state.refreshToken = action.payload.refreshToken;
-        state.isAuthenticated = true;
+        if (action.payload) {
+          state.user = action.payload.driver;
+          state.token = action.payload.token;
+          state.isAuthenticated = true;
+        }
         state.error = null;
       })
       .addCase(login.rejected, (state, action) => {
@@ -162,28 +137,15 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.user = null;
         state.token = null;
-        state.refreshToken = null;
         state.isAuthenticated = false;
         state.error = null;
       })
       .addCase(logout.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
-      });
-
-    // Refresh Token
-    builder
-      .addCase(refreshToken.pending, (state) => {
-        state.isLoading = true;
-      })
-      .addCase(refreshToken.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.token = action.payload.token;
-        state.error = null;
-      })
-      .addCase(refreshToken.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
+        // Still log out locally even if API call fails
+        state.user = null;
+        state.token = null;
         state.isAuthenticated = false;
       });
 
@@ -194,12 +156,38 @@ const authSlice = createSlice({
       })
       .addCase(loadUserFromStorage.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.user = action.payload.user;
-        state.token = action.payload.token;
-        state.isAuthenticated = true;
+        if (action.payload) {
+          state.user = action.payload.user;
+          state.token = action.payload.token;
+          state.isAuthenticated = true;
+        }
         state.error = null;
       })
       .addCase(loadUserFromStorage.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+        state.isAuthenticated = false;
+      });
+
+    // Check Auth Status
+    builder
+      .addCase(checkAuthStatus.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(checkAuthStatus.fulfilled, (state, action) => {
+        state.isLoading = false;
+        if (action.payload) {
+          state.user = action.payload.user;
+          state.token = action.payload.token;
+          state.isAuthenticated = true;
+        } else {
+          state.user = null;
+          state.token = null;
+          state.isAuthenticated = false;
+        }
+        state.error = null;
+      })
+      .addCase(checkAuthStatus.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
         state.isAuthenticated = false;

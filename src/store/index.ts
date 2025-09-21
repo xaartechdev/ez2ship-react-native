@@ -3,7 +3,6 @@ import authSlice from './slices/authSlice';
 import tasksSlice from './slices/tasksSlice';
 import ordersSlice from './slices/ordersSlice';
 import notificationsSlice from './slices/notificationsSlice';
-import profileSlice from './slices/profileSlice';
 
 export const store = configureStore({
   reducer: {
@@ -11,7 +10,6 @@ export const store = configureStore({
     tasks: tasksSlice,
     orders: ordersSlice,
     notifications: notificationsSlice,
-    profile: profileSlice,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

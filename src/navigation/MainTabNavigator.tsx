@@ -2,6 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet } from 'react-native';
 
+// Updated: Changed Dashboard to Home
 import DashboardScreen from '../screens/DashboardScreen';
 import MyTasksScreen from '../screens/MyTasksScreen';
 import AlertsScreen from '../screens/AlertsScreen';
@@ -47,14 +48,14 @@ const MainTabNavigator: React.FC = () => {
       }}
     >
       <Tab.Screen
-        name="Dashboard"
+        name="Home"
         component={DashboardScreen}
         options={{
           tabBarIcon: ({ focused }) => (
             <TabIcon
               focused={focused}
               icon="🏠"
-              label="Dashboard"
+              label="Home"
             />
           ),
         }}
@@ -66,8 +67,8 @@ const MainTabNavigator: React.FC = () => {
           tabBarIcon: ({ focused }) => (
             <TabIcon
               focused={focused}
-              icon="📋"
-              label="My Tasks"
+              icon="📦"
+              label="Orders"
             />
           ),
         }}

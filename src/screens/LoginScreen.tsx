@@ -81,7 +81,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       await dispatch(login({
         email: email.trim().toLowerCase(),
         password,
-        deviceId: 'device-id-placeholder', // In real app, get from device
+        device_name: 'React Native App', // Updated to match API
       })).unwrap();
     } catch (error) {
       // Error is already handled in useEffect

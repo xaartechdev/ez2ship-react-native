@@ -1,94 +1,242 @@
-import { apiService } from './apiService';
-import {
-  LoginRequest,
-  LoginResponse,
-  RefreshTokenRequest,
-  User,
-  ApiResponse,
-} from '../types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiClient } from './apiClient';
+import { LoginResponse, RegisterResponse } from '../config/api';
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+  device_name?: string;
+}
+
+export interface RegisterData {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  password: string;
+  password_confirmation: string;
+  device_name?: string;
+}
+
+export interface User {
+  id: number;
+  driver_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  current_status?: string;
+  rating?: string;
+  total_trips?: number;
+  status: string;
+  onboarding_progress?: number;
+}
+
+export interface AuthResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    driver: User;
+    token: string;
+    token_type: string;
+  };
+  errors?: Record<string, string[]>;
+}
 
 class AuthService {
-  // Authentication endpoints
-  async login(credentials: LoginRequest): Promise<LoginResponse> {
-    const response = await apiService.post<LoginResponse>('/auth/login', credentials);
-    return response.data;
-  }
+  private tokenKey = 'auth_token';
+  private userKey = 'auth_user';
 
-  async logout(): Promise<void> {
+  async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      await apiService.post('/auth/logout');
-    } catch (error) {
-      // Continue with logout even if API call fails
-      console.warn('Logout API call failed:', error);
+      const response = await apiClient.login(
+        credentials.email,
+        credentials.password,
+        credentials.device_name || 'React Native App'
+      );
+
+      if (response.success && response.data) {
+        const loginData = response.data as LoginResponse;
+        // Store token and user data
+        await this.storeAuthData(loginData.token, loginData.driver);
+        
+        return {
+          success: true,
+          message: 'Login successful',
+          data: {
+            driver: loginData.driver,
+            token: loginData.token,
+            token_type: loginData.token_type,
+          },
+        };
+      }
+
+      return {
+        success: false,
+        message: response.message || 'Login failed',
+        errors: response.errors,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Login failed',
+      };
     }
-    apiService.removeAuthToken();
   }
 
-  async refreshToken(request: RefreshTokenRequest): Promise<LoginResponse> {
-    const response = await apiService.post<LoginResponse>('/auth/refresh', request);
-    return response.data;
+  async register(data: RegisterData): Promise<AuthResponse> {
+    try {
+      const response = await apiClient.register(data);
+
+      if (response.success && response.data) {
+        const registerData = response.data as RegisterResponse;
+        // Store token and user data
+        await this.storeAuthData(registerData.token, registerData.driver);
+        
+        return {
+          success: true,
+          message: 'Registration successful',
+          data: {
+            driver: registerData.driver,
+            token: registerData.token,
+            token_type: registerData.token_type,
+          },
+        };
+      }
+
+      return {
+        success: false,
+        message: response.message || 'Registration failed',
+        errors: response.errors,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Registration failed',
+      };
+    }
   }
 
-  async forgotPassword(email: string): Promise<{ message: string }> {
-    const response = await apiService.post<{ message: string }>('/auth/forgot-password', { email });
-    return response.data;
+  async logout(): Promise<{ success: boolean; message: string }> {
+    try {
+      // Call logout endpoint
+      await apiClient.logout();
+      
+      // Clear local auth data regardless of API response
+      await this.clearAuthData();
+      
+      return {
+        success: true,
+        message: 'Logged out successfully',
+      };
+    } catch (error: any) {
+      // Still clear local data even if API call fails
+      await this.clearAuthData();
+      
+      return {
+        success: true,
+        message: 'Logged out locally',
+      };
+    }
   }
 
-  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
-    const response = await apiService.post<{ message: string }>('/auth/reset-password', {
-      token,
-      newPassword,
-    });
-    return response.data;
+  async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await apiClient.forgotPassword(email);
+      return response;
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Failed to send reset email',
+      };
+    }
   }
 
-  async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
-    const response = await apiService.post<{ message: string }>('/auth/change-password', {
-      currentPassword,
-      newPassword,
-    });
-    return response.data;
+  async resetPassword(
+    email: string,
+    token: string,
+    password: string,
+    passwordConfirmation: string
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await apiClient.resetPassword(email, token, password, passwordConfirmation);
+      return response;
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Password reset failed',
+      };
+    }
   }
 
-  async verifyToken(): Promise<User> {
-    const response = await apiService.get<User>('/auth/verify');
-    return response.data;
+  async getStoredToken(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem(this.tokenKey);
+    } catch (error) {
+      console.error('Error getting stored token:', error);
+      return null;
+    }
   }
 
-  async updateProfile(profileData: Partial<User>): Promise<User> {
-    const response = await apiService.put<User>('/auth/profile', profileData);
-    return response.data;
+  async getStoredUser(): Promise<User | null> {
+    try {
+      const userString = await AsyncStorage.getItem(this.userKey);
+      return userString ? JSON.parse(userString) : null;
+    } catch (error) {
+      console.error('Error getting stored user:', error);
+      return null;
+    }
   }
 
-  async uploadProfileImage(imageUri: string): Promise<{ imageUrl: string }> {
-    const formData = new FormData();
-    formData.append('image', {
-      uri: imageUri,
-      type: 'image/jpeg',
-      name: 'profile.jpg',
-    } as any);
-
-    const response = await apiService.upload<{ imageUrl: string }>('/auth/profile/image', formData);
-    return response.data;
+  async isAuthenticated(): Promise<boolean> {
+    try {
+      const token = await this.getStoredToken();
+      const user = await this.getStoredUser();
+      return !!(token && user);
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+      return false;
+    }
   }
 
-  async deleteAccount(): Promise<{ message: string }> {
-    const response = await apiService.delete<{ message: string }>('/auth/account');
-    return response.data;
+  private async storeAuthData(token: string, user: User | any): Promise<void> {
+    try {
+      await AsyncStorage.setItem(this.tokenKey, token);
+      await AsyncStorage.setItem(this.userKey, JSON.stringify(user));
+    } catch (error) {
+      console.error('Error storing auth data:', error);
+      throw error;
+    }
   }
 
-  // Device management
-  async registerDevice(deviceToken: string, deviceType: 'ios' | 'android'): Promise<{ message: string }> {
-    const response = await apiService.post<{ message: string }>('/auth/devices', {
-      deviceToken,
-      deviceType,
-    });
-    return response.data;
+  private async clearAuthData(): Promise<void> {
+    try {
+      await AsyncStorage.multiRemove([this.tokenKey, this.userKey]);
+    } catch (error) {
+      console.error('Error clearing auth data:', error);
+    }
   }
 
-  async unregisterDevice(deviceToken: string): Promise<{ message: string }> {
-    const response = await apiService.delete<{ message: string }>(`/auth/devices/${deviceToken}`);
-    return response.data;
+  // Helper method to get current user info
+  async getCurrentUser(): Promise<User | null> {
+    return this.getStoredUser();
+  }
+
+  // Helper method to check if user needs to verify email
+  async needsEmailVerification(): Promise<boolean> {
+    const user = await this.getStoredUser();
+    // For EZ2Ship API, we'll assume email verification is handled server-side
+    // and not required for the mobile app
+    return false;
+  }
+
+  // Helper method to get user's full name
+  async getUserFullName(): Promise<string> {
+    const user = await this.getStoredUser();
+    if (user) {
+      return `${user.first_name} ${user.last_name}`.trim();
+    }
+    return 'User';
   }
 }
 

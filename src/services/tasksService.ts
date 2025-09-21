@@ -1,86 +1,235 @@
-import { apiService } from './apiService';
-import {
-  Task,
-  TaskListRequest,
-  UpdateTaskStatusRequest,
-  ApiResponse,
-} from '../types';
+import { apiClient } from './apiClient';
+
+export interface Task {
+  id: number;
+  order_id: string;
+  customer_name: string;
+  customer_phone: string;
+  type: string;
+  status: 'pending' | 'assigned' | 'in_progress' | 'picked_up' | 'in_transit' | 'delivered' | 'cancelled' | '';
+  pickup_address: string;
+  delivery_address: string;
+  scheduled_pickup: string;
+  delivery_date: string | null;
+  amount: string;
+  distance: number;
+  is_overdue: boolean;
+  can_accept: boolean;
+  can_reject: boolean;
+  can_update_status: boolean;
+  // Keep the original customer structure for backward compatibility
+  customer: {
+    id: number;
+    name: string;
+    phone: string;
+    email: string;
+  };
+}
+
+export interface TasksResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    summary: {
+      pending: number;
+      in_progress: number;
+      completed: number;
+    };
+    filtered_summary: {
+      pending: number;
+      in_progress: number;
+      completed: number;
+    };
+    tasks: Task[];
+    pagination: {
+      current_page: number;
+      per_page: number;
+      total: number;
+      last_page: number;
+      has_more: boolean;
+    };
+    filter_applied: string | null;
+    search_applied: string | null;
+  };
+}
+
+export interface TaskStatusUpdate {
+  status: string;
+  notes?: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
+}
 
 class TasksService {
-  // Get tasks list with filters
-  async getTasks(params: TaskListRequest = {}): Promise<Task[]> {
-    const queryParams = new URLSearchParams();
-    
-    if (params.page) queryParams.append('page', params.page.toString());
-    if (params.limit) queryParams.append('limit', params.limit.toString());
-    if (params.status) queryParams.append('status', params.status);
-    if (params.dateFrom) queryParams.append('dateFrom', params.dateFrom);
-    if (params.dateTo) queryParams.append('dateTo', params.dateTo);
-
-    const response = await apiService.get<Task[]>(`/tasks?${queryParams.toString()}`);
-    return response.data;
+  async getTasks(params?: {
+    status?: 'all' | 'pending' | 'in_progress' | 'completed';
+    search?: string;
+    per_page?: number;
+  }): Promise<TasksResponse> {
+    try {
+      const response = await apiClient.getTasks(params);
+      
+      // Transform the response to include customer object
+      if (response.success && response.data && (response.data as any).tasks) {
+        const apiData = response.data as any;
+        const transformedTasks = apiData.tasks.map((task: any) => ({
+          ...task,
+          customer: {
+            id: 0, // API doesn't provide customer ID
+            name: task.customer_name,
+            phone: task.customer_phone,
+            email: '', // API doesn't provide customer email
+          }
+        }));
+        
+        return {
+          ...response,
+          data: {
+            ...apiData,
+            tasks: transformedTasks
+          }
+        } as TasksResponse;
+      }
+      
+      return response as TasksResponse;
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch tasks',
+      };
+    }
   }
 
-  // Get single task by ID
-  async getTask(taskId: string): Promise<Task> {
-    const response = await apiService.get<Task>(`/tasks/${taskId}`);
-    return response.data;
+  async getTaskDetails(taskId: number): Promise<{
+    success: boolean;
+    message: string;
+    data?: Task;
+  }> {
+    try {
+      const response = await apiClient.getTaskDetails(taskId);
+      return response as { success: boolean; message: string; data?: Task };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch task details',
+      };
+    }
   }
 
-  // Update task status
-  async updateTaskStatus(request: UpdateTaskStatusRequest): Promise<Task> {
-    const response = await apiService.patch<Task>(`/tasks/${request.taskId}/status`, {
-      status: request.status,
-      notes: request.notes,
-      location: request.location,
+  async acceptTask(taskId: number): Promise<{
+    success: boolean;
+    message: string;
+    data?: Task;
+  }> {
+    try {
+      const response = await apiClient.acceptTask(taskId);
+      return response as { success: boolean; message: string; data?: Task };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Failed to accept task',
+      };
+    }
+  }
+
+  async rejectTask(taskId: number, reason: string): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    try {
+      const response = await apiClient.rejectTask(taskId, reason);
+      return response as { success: boolean; message: string };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Failed to reject task',
+      };
+    }
+  }
+
+  async updateTaskStatus(taskId: number, data: TaskStatusUpdate): Promise<{
+    success: boolean;
+    message: string;
+    data?: Task;
+  }> {
+    try {
+      const response = await apiClient.updateTaskStatus(taskId, data);
+      return response as { success: boolean; message: string; data?: Task };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Failed to update task status',
+      };
+    }
+  }
+
+  // Helper methods for common task operations
+  async startPickup(taskId: number, location?: { latitude: number; longitude: number }): Promise<{
+    success: boolean;
+    message: string;
+    data?: Task;
+  }> {
+    return this.updateTaskStatus(taskId, {
+      status: 'in_progress',
+      notes: 'Started pickup',
+      location,
     });
-    return response.data;
+  }
+
+  async confirmPickup(taskId: number, location?: { latitude: number; longitude: number }): Promise<{
+    success: boolean;
+    message: string;
+    data?: Task;
+  }> {
+    return this.updateTaskStatus(taskId, {
+      status: 'picked_up',
+      notes: 'Package picked up',
+      location,
+    });
+  }
+
+  async startDelivery(taskId: number, location?: { latitude: number; longitude: number }): Promise<{
+    success: boolean;
+    message: string;
+    data?: Task;
+  }> {
+    return this.updateTaskStatus(taskId, {
+      status: 'in_transit',
+      notes: 'Started delivery',
+      location,
+    });
+  }
+
+  async confirmDelivery(taskId: number, notes?: string, location?: { latitude: number; longitude: number }): Promise<{
+    success: boolean;
+    message: string;
+    data?: Task;
+  }> {
+    return this.updateTaskStatus(taskId, {
+      status: 'delivered',
+      notes: notes || 'Package delivered successfully',
+      location,
+    });
   }
 
   // Get tasks by status
-  async getTasksByStatus(status: 'pending' | 'in-progress' | 'completed'): Promise<Task[]> {
-    return this.getTasks({ status });
+  async getPendingTasks(): Promise<TasksResponse> {
+    return this.getTasks({ status: 'pending' });
   }
 
-  // Get today's tasks
-  async getTodaysTasks(): Promise<Task[]> {
-    const today = new Date().toISOString().split('T')[0];
-    return this.getTasks({ dateFrom: today, dateTo: today });
+  async getInProgressTasks(): Promise<TasksResponse> {
+    return this.getTasks({ status: 'in_progress' });
   }
 
-  // Accept task
-  async acceptTask(taskId: string): Promise<Task> {
-    const response = await apiService.post<Task>(`/tasks/${taskId}/accept`);
-    return response.data;
+  async getCompletedTasks(): Promise<TasksResponse> {
+    return this.getTasks({ status: 'completed' });
   }
 
-  // Start task
-  async startTask(taskId: string, location?: { latitude: number; longitude: number }): Promise<Task> {
-    const response = await apiService.post<Task>(`/tasks/${taskId}/start`, { location });
-    return response.data;
-  }
-
-  // Complete task
-  async completeTask(taskId: string, notes?: string, location?: { latitude: number; longitude: number }): Promise<Task> {
-    const response = await apiService.post<Task>(`/tasks/${taskId}/complete`, { notes, location });
-    return response.data;
-  }
-
-  // Cancel task
-  async cancelTask(taskId: string, reason: string): Promise<Task> {
-    const response = await apiService.post<Task>(`/tasks/${taskId}/cancel`, { reason });
-    return response.data;
-  }
-
-  // Add notes to task
-  async addTaskNotes(taskId: string, notes: string): Promise<Task> {
-    const response = await apiService.post<Task>(`/tasks/${taskId}/notes`, { notes });
-    return response.data;
-  }
-
-  // Get task history
-  async getTaskHistory(page: number = 1, limit: number = 20): Promise<Task[]> {
-    return this.getTasks({ page, limit, status: 'completed' });
+  // Search tasks
+  async searchTasks(query: string): Promise<TasksResponse> {
+    return this.getTasks({ search: query });
   }
 }
 

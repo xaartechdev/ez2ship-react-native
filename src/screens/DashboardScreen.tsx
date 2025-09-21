@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,9 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSelector } from 'react-redux';
+import { authService } from '../services/authService';
+import { RootState } from '../store';
 
 const { width } = Dimensions.get('window');
 
@@ -16,6 +19,27 @@ interface DashboardScreenProps {
 }
 
 const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
+  const [userName, setUserName] = useState('User');
+  const { user } = useSelector((state: RootState) => state.auth);
+
+  useEffect(() => {
+    const getUserName = async () => {
+      try {
+        if (user) {
+          const fullName = `${user.first_name} ${user.last_name}`.trim();
+          setUserName(fullName || 'User');
+        } else {
+          const fullName = await authService.getUserFullName();
+          setUserName(fullName);
+        }
+      } catch (error) {
+        console.error('Error getting user name:', error);
+        setUserName('User');
+      }
+    };
+
+    getUserName();
+  }, [user]);
   // Chart data for weekly performance
   const chartData = [
     { day: 'Mon', value: 85 },
@@ -36,7 +60,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.greeting}>Good morning, John</Text>
+          <Text style={styles.greeting}>Good morning, {userName}</Text>
           <Text style={styles.subtitle}>Ready for your deliveries?</Text>
         </View>
 
