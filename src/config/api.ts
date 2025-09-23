@@ -1,6 +1,6 @@
 // API Configuration for EZ2Ship Driver App
 export const API_CONFIG = {
-  BASE_URL: 'https://devez2ship.xaartech.com/api/driver',
+  BASE_URL: 'https://devez2ship.xaartech.com/api',
   TIMEOUT: 30000,
   RETRY_ATTEMPTS: 3,
 };

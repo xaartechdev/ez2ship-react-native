@@ -14,11 +14,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../store';
-import { 
-  fetchTasks, 
-  setFilter, 
+import {
+  fetchTasks,
+  setFilter,
   setSearch,
-  clearError 
+  clearError,
 } from '../store/slices/tasksSlice';
 import { Task } from '../services/tasksService';
 
@@ -28,10 +28,14 @@ interface MyTasksScreenProps {
 
 const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
   const dispatch = useDispatch<AppDispatch>();
-  const { tasks, isLoading, error, filter, search, summary } = useSelector((state: RootState) => state.tasks);
-  
+  const { tasks, isLoading, error, filter, search, summary } = useSelector(
+    (state: RootState) => state.tasks
+  );
+
   const [refreshing, setRefreshing] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'pending' | 'in_progress' | 'completed'>('pending');
+  const [activeFilter, setActiveFilter] = useState<
+    'pending' | 'in_progress' | 'completed'
+  >('pending');
 
   useEffect(() => {
     dispatch(fetchTasks({}));
@@ -43,50 +47,81 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  // Calculate task counts for summary cards
-  const pendingCount = tasks.filter(task => 
-    task.status === 'pending' || task.status === '' || task.status === 'assigned'
-  ).length;
-  
-  const inProgressCount = tasks.filter(task => 
-    task.status === 'in_progress' || task.status === 'picked_up' || task.status === 'in_transit'
-  ).length;
-  
-  const completedCount = tasks.filter(task => 
-    task.status === 'delivered' || task.status === 'cancelled'
+  // Count tasks
+  const pendingCount = tasks.filter(
+    (task) =>
+      task.status === 'pending' ||
+      task.status === '' ||
+      task.status === 'assigned'
   ).length;
 
-  const filteredTasks = tasks.filter(task => {
-    // Map filter to actual task statuses
+  const inProgressCount = tasks.filter(
+    (task) =>
+      task.status === 'in_progress' ||
+      task.status === 'picked_up' ||
+      task.status === 'in_transit'
+  ).length;
+
+  const completedCount = tasks.filter(
+    (task) => task.status === 'delivered' || task.status === 'cancelled'
+  ).length;
+
+  const filteredTasks = tasks.filter((task) => {
     let matchesFilter = false;
     switch (activeFilter) {
       case 'pending':
-        matchesFilter = task.status === 'pending' || task.status === '' || task.status === 'assigned';
+        matchesFilter =
+          task.status === 'pending' ||
+          task.status === '' ||
+          task.status === 'assigned';
         break;
       case 'in_progress':
-        matchesFilter = task.status === 'in_progress' || task.status === 'picked_up' || task.status === 'in_transit';
+        matchesFilter =
+          task.status === 'in_progress' ||
+          task.status === 'picked_up' ||
+          task.status === 'in_transit';
         break;
       case 'completed':
-        matchesFilter = task.status === 'delivered' || task.status === 'cancelled';
+        matchesFilter =
+          task.status === 'delivered' || task.status === 'cancelled';
         break;
       default:
         matchesFilter = true;
     }
-    
-    const matchesSearch = search === '' || 
+
+    const matchesSearch =
+      search === '' ||
       task.customer_name.toLowerCase().includes(search.toLowerCase()) ||
       task.pickup_address.toLowerCase().includes(search.toLowerCase()) ||
       task.delivery_address.toLowerCase().includes(search.toLowerCase());
+
     return matchesFilter && matchesSearch;
   });
 
-  const handleFilterPress = (filter: 'pending' | 'in_progress' | 'completed') => {
+  const handleFilterPress = (
+    filter: 'pending' | 'in_progress' | 'completed'
+  ) => {
     setActiveFilter(filter);
-    // Map to store slice filter values
-    const storeFilter = filter === 'completed' ? 'completed' : filter;
-    if (storeFilter === 'pending' || storeFilter === 'in_progress' || storeFilter === 'completed') {
-      dispatch(setFilter(storeFilter));
+    dispatch(setFilter(filter));
+    
+    // Map UI filter to API status values - apiClient will handle 'in_progress' to 'in_transit' mapping
+    let apiStatus: 'pending' | 'in_progress' | 'completed';
+    switch (filter) {
+      case 'pending':
+        apiStatus = 'pending';
+        break;
+      case 'in_progress':
+        apiStatus = 'in_progress'; // apiClient will map this to 'in_transit'
+        break;
+      case 'completed':
+        apiStatus = 'completed';
+        break;
+      default:
+        apiStatus = 'pending';
     }
+    
+    // Make API call with the correct status
+    dispatch(fetchTasks({ status: apiStatus }));
   };
 
   const handleSearchChange = (text: string) => {
@@ -94,65 +129,72 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
   };
 
   const handleTaskPress = (task: Task) => {
-    navigation.navigate('TaskDetails', { task });
+    navigation.navigate('OrderDetails', { task });
   };
 
   const handleCallCustomer = (phoneNumber: string) => {
-    // You can implement phone calling functionality here
-    Alert.alert(
-      'Call Customer',
-      `Call ${phoneNumber}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Call', onPress: () => {
-          // Implement actual phone call here using Linking
-          // Linking.openURL(`tel:${phoneNumber}`);
+    Alert.alert('Call Customer', `Call ${phoneNumber}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Call',
+        onPress: () => {
           console.log('Calling:', phoneNumber);
-        }}
-      ]
-    );
+        },
+      },
+    ]);
   };
 
   const renderTaskCard = (task: Task) => (
-    <TouchableOpacity 
-      key={task.id} 
+    <TouchableOpacity
+      key={task.id}
       style={styles.taskCard}
       onPress={() => handleTaskPress(task)}
     >
       <View style={styles.taskHeader}>
         <Text style={styles.taskId}>{task.order_id}</Text>
         <View style={styles.statusContainer}>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(task.status) }]}>
-            <Text style={styles.statusText}>{getStatusText(task.status, task.is_overdue)}</Text>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: getStatusColor(task.status) },
+            ]}
+          >
+            <Text style={styles.statusText}>
+              {getStatusText(task.status, task.is_overdue)}
+            </Text>
           </View>
           {task.is_overdue && (
             <Text style={styles.overdueText}>Overdue</Text>
           )}
         </View>
       </View>
-      
+
       <Text style={styles.customerName}>{task.customer_name}</Text>
-      
-      {/* Pickup Section */}
+
       <View style={styles.addressSection}>
         <View style={styles.typeIndicator}>
           <View style={styles.greenDot} />
           <Text style={styles.typeText}>Pickup</Text>
         </View>
         <Text style={styles.address}>{task.pickup_address}</Text>
-        
+
         <View style={styles.taskMeta}>
           <View style={styles.metaItem}>
             <Text style={styles.metaIcon}>🕐</Text>
             <Text style={styles.metaText}>
-              {task.scheduled_pickup ? new Date(task.scheduled_pickup).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'TBD'}
+              {task.scheduled_pickup
+                ? new Date(task.scheduled_pickup).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : 'TBD'}
             </Text>
           </View>
           <View style={styles.metaItem}>
-            <Text style={styles.metaIcon}>�</Text>
+            <Text style={styles.metaIcon}>📍</Text>
             <Text style={styles.metaText}>{task.distance} miles</Text>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.callButton}
             onPress={() => handleCallCustomer(task.customer_phone)}
           >
@@ -165,23 +207,22 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
 
   const getStatusText = (status: string, isOverdue: boolean) => {
     if (isOverdue) return 'Overdue';
-    
     switch (status) {
       case 'pending':
       case '':
-      case 'assigned': 
+      case 'assigned':
         return 'Ready';
-      case 'in_progress': 
+      case 'in_progress':
         return 'In Progress';
-      case 'picked_up': 
+      case 'picked_up':
         return 'Picked Up';
-      case 'in_transit': 
+      case 'in_transit':
         return 'In Transit';
-      case 'delivered': 
+      case 'delivered':
         return 'Delivered';
-      case 'cancelled': 
+      case 'cancelled':
         return 'Cancelled';
-      default: 
+      default:
         return 'Ready';
     }
   };
@@ -190,19 +231,18 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
     switch (status) {
       case 'pending':
       case '':
-      case 'assigned': 
+      case 'assigned':
         return '#007AFF';
-      case 'in_progress': 
+      case 'in_progress':
         return '#007AFF';
-      case 'picked_up': 
+      case 'picked_up':
+      case 'in_transit':
         return '#FF9500';
-      case 'in_transit': 
-        return '#FF9500';
-      case 'delivered': 
+      case 'delivered':
         return '#34C759';
-      case 'cancelled': 
+      case 'cancelled':
         return '#FF3B30';
-      default: 
+      default:
         return '#007AFF';
     }
   };
@@ -210,85 +250,76 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>My Tasks</Text>
-        {summary && (
-          <Text style={styles.subtitle}>
-            {tasks.length} total, {summary.pending} pending, {summary.in_progress} in progress
-          </Text>
-        )}
       </View>
 
-      {/* Summary Cards */}
-      <View style={styles.summaryContainer}>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryNumber}>{pendingCount}</Text>
-          <Text style={styles.summaryLabel}>Pending</Text>
+      {/* Compact Summary Row */}
+      <View style={styles.summaryRow}>
+        <View style={styles.summaryBox}>
+          <Text style={styles.summaryCount}>{pendingCount}</Text>
+          <Text style={styles.summaryText}>Pending</Text>
         </View>
-        <View style={styles.summaryCard}>
-          <Text style={[styles.summaryNumber, { color: '#007AFF' }]}>{inProgressCount}</Text>
-          <Text style={styles.summaryLabel}>In Progress</Text>
+        <View style={styles.summaryBox}>
+          <Text style={[styles.summaryCount, { color: '#007AFF' }]}>
+            {inProgressCount}
+          </Text>
+          <Text style={styles.summaryText}>In Progress</Text>
         </View>
-        <View style={styles.summaryCard}>
-          <Text style={[styles.summaryNumber, { color: '#34C759' }]}>{completedCount}</Text>
-          <Text style={styles.summaryLabel}>Completed</Text>
+        <View style={styles.summaryBox}>
+          <Text style={[styles.summaryCount, { color: '#34C759' }]}>
+            {completedCount}
+          </Text>
+          <Text style={styles.summaryText}>Completed</Text>
         </View>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <View style={styles.searchWrapper}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search tasks..."
-            value={search}
-            onChangeText={handleSearchChange}
-          />
-          <TouchableOpacity style={styles.filterIcon}>
-            <Text style={styles.filterIconText}>⚙</Text>
-          </TouchableOpacity>
-        </View>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search tasks..."
+          value={search}
+          onChangeText={handleSearchChange}
+        />
+        <TouchableOpacity style={styles.filterIcon}>
+          <Text style={styles.filterIconText}>⚙</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Filter Tabs */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterContainer}>
+      {/* Tabs */}
+      <View style={styles.tabsContainer}>
         {[
           { key: 'pending', label: `Pending (${pendingCount})` },
           { key: 'in_progress', label: `In Progress (${inProgressCount})` },
-          { key: 'completed', label: `Completed (${completedCount})` }
-        ].map((filter) => (
+          { key: 'completed', label: `Completed (${completedCount})` },
+        ].map((tab) => (
           <TouchableOpacity
-            key={filter.key}
+            key={tab.key}
             style={[
-              styles.filterTab,
-              activeFilter === filter.key && styles.activeFilterTab
+              styles.tab,
+              activeFilter === tab.key && styles.activeTab,
             ]}
-            onPress={() => handleFilterPress(filter.key as 'pending' | 'in_progress' | 'completed')}
+            onPress={() =>
+              handleFilterPress(tab.key as 'pending' | 'in_progress' | 'completed')
+            }
           >
-            <Text style={[
-              styles.filterText,
-              activeFilter === filter.key && styles.activeFilterText
-            ]}>
-              {filter.label}
+            <Text
+              style={[
+                styles.tabText,
+                activeFilter === tab.key && styles.activeTabText,
+              ]}
+            >
+              {tab.label}
             </Text>
           </TouchableOpacity>
         ))}
-      </ScrollView>
-
-      {/* Error Display */}
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={() => dispatch(clearError())}>
-            <Text style={styles.dismissText}>Dismiss</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      </View>
 
       {/* Tasks List */}
-      <ScrollView 
+      <ScrollView
         style={styles.tasksList}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -311,198 +342,103 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
   header: {
-    padding: 20,
-    backgroundColor: '#FFFFFF',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000000',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#666666',
-    marginTop: 4,
-  },
-  summaryContainer: {
-    flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'space-between',
+    paddingTop: 20,
+    paddingBottom: 10,
+    backgroundColor: '#FFF',
   },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 4,
-    alignItems: 'center',
+  title: { fontSize: 22, fontWeight: '600', color: '#000' },
+
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 12,
+    backgroundColor: '#FFF',
   },
-  summaryNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FF9500',
-    marginBottom: 4,
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: '#666666',
-    fontWeight: '500',
-  },
+  summaryBox: { alignItems: 'center' },
+  summaryCount: { fontSize: 18, fontWeight: '600', color: '#FF9500' },
+  summaryText: { fontSize: 13, color: '#666' },
+
   searchContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#FFFFFF',
-  },
-  searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#FFF',
   },
   searchInput: {
     flex: 1,
-    height: 40,
+    height: 38,
     borderColor: '#E0E0E0',
     borderWidth: 1,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#F8F8F8',
-    marginRight: 10,
+    paddingHorizontal: 10,
+    backgroundColor: '#F9F9F9',
+    fontSize: 14,
   },
   filterIcon: {
-    width: 40,
-    height: 40,
+    marginLeft: 8,
+    width: 38,
+    height: 38,
     borderRadius: 8,
-    backgroundColor: '#F0F0F0',
-    justifyContent: 'center',
+    backgroundColor: '#F1F1F1',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  filterIconText: {
-    fontSize: 16,
-    color: '#666666',
+  filterIconText: { fontSize: 16, color: '#666' },
+
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    justifyContent: 'space-around',
   },
-  filterContainer: {
-    paddingHorizontal: 15,
-    paddingVertical: 5,
-    backgroundColor: '#FFFFFF',
-  },
-  filterTab: {
+  tab: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    marginHorizontal: 3,
     borderRadius: 16,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#F1F1F1',
   },
-  activeFilterTab: {
-    backgroundColor: '#007AFF',
-  },
-  filterText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#666666',
-  },
-  activeFilterText: {
-    color: '#FFFFFF',
-  },
-  errorContainer: {
-    backgroundColor: '#FFE6E6',
-    padding: 12,
-    marginHorizontal: 20,
-    marginVertical: 10,
-    borderRadius: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  errorText: {
-    color: '#CC0000',
-    flex: 1,
-  },
-  dismissText: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  tasksList: {
-    flex: 1,
-    padding: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 50,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 50,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666666',
-  },
+  activeTab: { backgroundColor: '#007AFF' },
+  tabText: { fontSize: 12, color: '#666', fontWeight: '500' },
+  activeTabText: { color: '#FFF' },
+
+  tasksList: { flex: 1, padding: 16 },
   taskCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+    elevation: 1,
   },
   taskHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 6,
   },
-  taskId: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  taskId: { fontSize: 14, color: '#666', fontWeight: '500' },
+  statusContainer: { flexDirection: 'row', alignItems: 'center' },
   statusBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  overdueText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FF3B30',
-  },
+  statusText: { fontSize: 10, color: '#FFF', fontWeight: '600' },
+  overdueText: { marginLeft: 4, color: '#FF3B30', fontSize: 12 },
   customerName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 12,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 6,
+    color: '#000',
   },
-  addressSection: {
-    marginBottom: 12,
-  },
-  typeIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
+  addressSection: { marginTop: 4 },
+  typeIndicator: { flexDirection: 'row', alignItems: 'center' },
   greenDot: {
     width: 8,
     height: 8,
@@ -510,47 +446,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#34C759',
     marginRight: 6,
   },
-  typeIcon: {
-    fontSize: 12,
-    marginRight: 6,
-  },
-  typeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#666666',
-    textTransform: 'uppercase',
-  },
-  address: {
-    fontSize: 14,
-    color: '#333333',
-    marginLeft: 18,
-    marginBottom: 8,
-  },
-  taskMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 18,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  metaIcon: {
-    fontSize: 14,
-    marginRight: 4,
-  },
-  metaText: {
-    fontSize: 12,
-    color: '#666666',
-  },
-  callButton: {
-    marginLeft: 'auto',
-    padding: 8,
-  },
-  callIcon: {
-    fontSize: 16,
-  },
+  typeText: { fontSize: 12, color: '#666' },
+  address: { fontSize: 14, color: '#333', marginTop: 2 },
+  taskMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', marginRight: 12 },
+  metaIcon: { marginRight: 4 },
+  metaText: { fontSize: 12, color: '#666' },
+  callButton: { marginLeft: 'auto' },
+  callIcon: { fontSize: 16 },
+  loadingContainer: { marginTop: 40, alignItems: 'center' },
+  emptyContainer: { marginTop: 40, alignItems: 'center' },
+  emptyText: { fontSize: 15, color: '#999' },
 });
 
 export default MyTasksScreen;

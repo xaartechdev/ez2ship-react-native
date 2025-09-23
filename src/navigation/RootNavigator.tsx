@@ -2,7 +2,9 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSelector } from 'react-redux';
 import { Text } from 'react-native';
+import { RootState } from '../store';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -138,16 +140,20 @@ const AppStackNavigator = () => {
 
 // Root Navigation
 const RootNavigator = () => {
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+
   return (
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
         }}
-        initialRouteName="Auth"
       >
-        <Stack.Screen name="Auth" component={AuthStackNavigator} />
-        <Stack.Screen name="Main" component={AppStackNavigator} />
+        {isAuthenticated ? (
+          <Stack.Screen name="Main" component={AppStackNavigator} />
+        ) : (
+          <Stack.Screen name="Auth" component={AuthStackNavigator} />
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );

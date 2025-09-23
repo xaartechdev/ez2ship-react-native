@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -6,241 +6,450 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  TextInput,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import {orderService} from '../services/orderService';
 
-interface OrderDetailsScreenProps {
-  route?: {
-    params?: {
-      orderId: string;
-      customerName: string;
-      status: string;
-    };
-  };
-  navigation?: any;
+interface Task {
+  id: number;
+  order_id: string;
+  customer_name: string;
+  customer_phone: string;
+  type: string;
+  status: string;
+  pickup_address: string;
+  delivery_address: string;
+  scheduled_pickup: string;
+  delivery_date: string | null;
+  amount: string;
+  distance: number;
+  is_overdue: boolean;
+  can_accept: boolean;
+  can_reject: boolean;
+  can_update_status: boolean;
+  order_notes: string | null;
+  payment_status: string;
+  vehicle_type: string;
+  histories: any[];
 }
 
-const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({ route, navigation }) => {
-  const { orderId = 'ORD-2024-001', customerName = 'Sarah Johnson', status = 'Start Trip' } = route?.params || {};
+interface OrderDetailsScreenProps {
+  route: any;
+  navigation: any;
+}
 
-  const orderData = {
-    'ORD-2024-001': {
-      customer: 'Sarah Johnson',
-      vehicleType: 'Van',
-      distance: '12.5 miles',
-      duration: '35 min',
-      scheduled: 'Mon, Jan 15, 2:30 PM',
-      pickupAddress: '123 Warehouse St, Industrial District, CA 90210',
-      deliveryAddress: '456 Customer Ave, Downtown, CA 90211',
-      status: 'Start Trip',
-    },
-    'ORD-2024-002': {
-      customer: 'Mike Chen',
-      vehicleType: 'Van',
-      distance: '8.2 miles',
-      duration: '25 min',
-      scheduled: 'Mon, Jan 15, 5:00 PM',
-      pickupAddress: '789 Supply Center, West Side, CA 90212',
-      deliveryAddress: '321 Office Plaza, Business District, CA 90213',
-      status: 'In Transit',
-    },
-    'ORD-2024-003': {
-      customer: 'Emily Davis',
-      vehicleType: 'Van',
-      distance: '15.7 miles',
-      duration: '40 min',
-      scheduled: 'Mon, Jan 15, 7:30 PM',
-      pickupAddress: '555 Manufacturing Way, South End, CA 90214',
-      deliveryAddress: '777 Retail Center, North Hills, CA 90215',
-      status: 'Arrived at Destination',
-    },
-  };
+const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
+  route,
+  navigation,
+}) => {
+  const {task: initialTask} = route.params;
+  const [task, setTask] = useState<Task>(initialTask);
+  const [notes, setNotes] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const order = orderData[orderId as keyof typeof orderData];
-
-  const handleStartTrip = () => {
-    navigation.navigate('TripProgress', { orderId, status: 'Start Trip' });
-  };
-
-  const handleInTransit = () => {
-    navigation.navigate('TripProgress', { orderId, status: 'In Transit' });
-  };
-
-  const handleArrivedAtDestination = () => {
-    navigation.navigate('TripProgress', { orderId, status: 'Arrived at Destination' });
-  };
-
-  const getStatusButton = () => {
-    switch (order.status) {
-      case 'Start Trip':
-        return (
-          <TouchableOpacity style={styles.startTripButton} onPress={handleStartTrip}>
-            <Text style={styles.startTripButtonText}>✈️ Start Trip</Text>
-          </TouchableOpacity>
-        );
-      case 'In Transit':
-        return (
-          <TouchableOpacity style={styles.arrivedButton} onPress={handleInTransit}>
-            <Text style={styles.arrivedButtonText}>Arrived at Destination</Text>
-          </TouchableOpacity>
-        );
-      case 'Arrived at Destination':
-        return (
-          <TouchableOpacity style={styles.deliveredButton} onPress={handleArrivedAtDestination}>
-            <Text style={styles.deliveredButtonText}>Mark as Delivered</Text>
-          </TouchableOpacity>
-        );
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+      case 'assigned':
+        return '#FF9500';
+      case 'in_progress':
+      case 'picked_up':
+      case 'in_transit':
+        return '#007AFF';
+      case 'arrived':
+      case 'arrived_at_destination':
+        return '#34C759';
+      case 'completed':
+      case 'delivered':
+        return '#4CAF50';
+      case 'cancelled':
+        return '#FF3B30';
       default:
-        return null;
+        return '#8E8E93';
     }
   };
 
-  const getHeaderButton = () => {
-    switch (order.status) {
-      case 'Start Trip':
-        return (
-          <TouchableOpacity style={styles.headerButton} onPress={handleStartTrip}>
-            <Text style={styles.headerButtonText}>Start Trip</Text>
-          </TouchableOpacity>
-        );
-      case 'In Transit':
-        return (
-          <TouchableOpacity style={[styles.headerButton, styles.inTransitButton]}>
-            <Text style={styles.headerButtonText}>In Transit</Text>
-          </TouchableOpacity>
-        );
-      case 'Arrived at Destination':
-        return (
-          <TouchableOpacity style={[styles.headerButton, styles.arrivedHeaderButton]}>
-            <Text style={styles.headerButtonText}>Arrived at Destination</Text>
-          </TouchableOpacity>
-        );
+  const getStatusDisplayText = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'Start Trip';
+      case 'assigned':
+        return 'Start Trip';
+      case 'in_progress':
+      case 'picked_up':
+        return 'In Transit';
+      case 'in_transit':
+        return 'In Transit';
+      case 'arrived':
+      case 'arrived_at_destination':
+        return 'Arrived at Destination';
+      case 'completed':
+      case 'delivered':
+        return 'Delivered';
+      case 'cancelled':
+        return 'Cancelled';
       default:
-        return null;
+        return status;
     }
+  };
+
+  const getActionButtonText = () => {
+    switch (task.status) {
+      case 'pending':
+      case 'assigned':
+        return 'Start Trip';
+      case 'in_progress':
+      case 'picked_up':
+      case 'in_transit':
+        return 'Arrived at Destination';
+      case 'arrived':
+      case 'arrived_at_destination':
+        return 'Mark as Delivered';
+      default:
+        return '';
+    }
+  };
+
+  const getActionButtonColor = () => {
+    switch (task.status) {
+      case 'pending':
+      case 'assigned':
+        return '#007AFF';
+      case 'in_progress':
+      case 'picked_up':
+      case 'in_transit':
+        return '#34C759';
+      case 'arrived':
+      case 'arrived_at_destination':
+        return '#4CAF50';
+      case 'completed':
+        return '#4CAF50';
+      default:
+        return '#8E8E93';
+    }
+  };
+
+  const getActionButtonIcon = () => {
+    switch (task.status) {
+      case 'pending':
+      case 'assigned':
+        return '✈️';
+      case 'in_progress':
+      case 'picked_up':
+      case 'in_transit':
+        return '';
+      case 'arrived':
+      case 'arrived_at_destination':
+        return '';
+      case 'completed':
+        return '';
+      default:
+        return '';
+    }
+  };
+
+  const handleActionPress = async () => {
+    try {
+      setLoading(true);
+      
+      switch (task.status) {
+        case 'pending':
+        case 'assigned':
+          // Start the trip - update status to in_transit
+          await orderService.updateOrderStatus(task.id, {
+            status: 'in_transit',
+            notes: notes
+          });
+          setTask({...task, status: 'in_transit'});
+          break;
+        case 'in_progress':
+        case 'picked_up':
+        case 'in_transit':
+          // Arrive at destination - update status to arrived_at_destination
+          await orderService.updateOrderStatus(task.id, {
+            status: 'arrived_at_destination',
+            notes: notes
+          });
+          setTask({...task, status: 'arrived_at_destination'});
+          break;
+        case 'arrived':
+        case 'arrived_at_destination':
+          // Mark as completed - update status to completed and navigate to proof of delivery
+          await orderService.updateOrderStatus(task.id, {
+            status: 'completed',
+            notes: notes
+          });
+          setTask({...task, status: 'completed'});
+          navigation.navigate('ProofOfDelivery', {task: {...task, status: 'completed'}});
+          return;
+        default:
+          return;
+      }
+      
+      Alert.alert('Success', `Order status updated successfully`);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update order status');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCallPress = () => {
+    Alert.alert('Call Customer', 'Would you like to call the customer?', [
+      {text: 'Cancel', style: 'cancel'},
+      {text: 'Call', onPress: () => console.log('Call customer')},
+    ]);
+  };
+
+  const handleAlertPress = () => {
+    Alert.alert('Alert Customer', 'Send notification to customer?', [
+      {text: 'Cancel', style: 'cancel'},
+      {text: 'Send', onPress: () => console.log('Alert customer')},
+    ]);
+  };
+
+  const handleReportIssue = () => {
+    Alert.alert('Report Issue', 'What type of issue would you like to report?', [
+      {text: 'Cancel', style: 'cancel'},
+      {text: 'Delay', onPress: () => console.log('Report delay')},
+      {text: 'Damage', onPress: () => console.log('Report damage')},
+      {text: 'Other', onPress: () => console.log('Report other issue')},
+    ]);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>←</Text>
+          <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{orderId}</Text>
-        {getHeaderButton()}
+        <Text style={styles.headerTitle}>{task.order_id}</Text>
+        <View style={[styles.statusBadge, {backgroundColor: getActionButtonColor()}]}>
+          <Text style={styles.statusBadgeText}>{getActionButtonText()}</Text>
+        </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Order Details Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Order Details</Text>
-          
-          <View style={styles.detailsGrid}>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Customer</Text>
-              <Text style={styles.detailValue}>{order.customer}</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Vehicle Type</Text>
-              <Text style={styles.detailValue}>{order.vehicleType}</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Distance</Text>
-              <Text style={styles.detailValue}>{order.distance}</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Duration</Text>
-              <Text style={styles.detailValue}>{order.duration}</Text>
+      {/* Content */}
+      <ScrollView style={styles.content}>
+        {/* Show full order details for pending orders, simplified for others */}
+        {(task.status === 'pending' || task.status === 'assigned') ? (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Order Details</Text>
+            <View style={styles.detailsGrid}>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Customer</Text>
+                <Text style={styles.detailValue}>{task.customer_name}</Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Vehicle Type</Text>
+                <Text style={styles.detailValue}>{task.vehicle_type}</Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Distance</Text>
+                <Text style={styles.detailValue}>{task?.distance?.toFixed(1)} miles</Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Duration</Text>
+                <Text style={styles.detailValue}>35 min</Text>
+              </View>
             </View>
           </View>
+        ) : (
+          <View style={styles.simplifiedDetails}>
+            <Text style={styles.simplifiedDistance}>{task?.distance?.toFixed(1)} miles</Text>
+            <Text style={styles.simplifiedDuration}>35 min</Text>
+          </View>
+        )}
 
-          <View style={styles.scheduledContainer}>
-            <Text style={styles.detailLabel}>Scheduled</Text>
-            <View style={styles.scheduledRow}>
-              <Text style={styles.scheduledValue}>{order.scheduled}</Text>
-              <TouchableOpacity style={styles.callButton}>
-                <Text style={styles.callIcon}>📞</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.alertButton}>
-                <Text style={styles.alertIcon}>⚠️</Text>
-              </TouchableOpacity>
-            </View>
+        {/* Scheduled Time with Call/Alert buttons */}
+        <View style={styles.scheduledContainer}>
+          <View style={styles.scheduledInfo}>
+            <Text style={styles.scheduledLabel}>Scheduled</Text>
+            <Text style={styles.scheduledTime}>
+              {new Date(task.scheduled_pickup).toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short', 
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              })}
+            </Text>
+          </View>
+          <View style={styles.actionButtons}>
+            <TouchableOpacity style={styles.callButton} onPress={handleCallPress}>
+              <Text style={styles.callIcon}>📞</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.alertButton} onPress={handleAlertPress}>
+              <Text style={styles.alertIcon}>⚠️</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Addresses Section */}
-        <View style={styles.section}>
-          {/* Pickup Address */}
+        {/* Addresses */}
+        <View style={styles.addressesContainer}>
           <View style={styles.addressItem}>
-            <View style={styles.addressHeader}>
-              <Text style={styles.pickupDot}>🟢</Text>
+            <View style={[styles.addressDot, {backgroundColor: '#4CAF50'}]} />
+            <View style={styles.addressInfo}>
               <Text style={styles.addressLabel}>Pickup Address</Text>
+              <Text style={styles.addressText}>{task.pickup_address}</Text>
             </View>
-            <Text style={styles.addressValue}>{order.pickupAddress}</Text>
           </View>
-
-          {/* Delivery Address */}
           <View style={styles.addressItem}>
-            <View style={styles.addressHeader}>
-              <Text style={styles.deliveryDot}>🔴</Text>
+            <View style={[styles.addressDot, {backgroundColor: '#FF5722'}]} />
+            <View style={styles.addressInfo}>
               <Text style={styles.addressLabel}>Delivery Address</Text>
+              <Text style={styles.addressText}>{task.delivery_address}</Text>
             </View>
-            <Text style={styles.addressValue}>{order.deliveryAddress}</Text>
           </View>
         </View>
 
-        {/* Trip Progress Section */}
-        <View style={styles.section}>
+        {/* Trip Progress */}
+        <View style={styles.card}>
           <Text style={styles.sectionTitle}>Trip Progress</Text>
           
-          <View style={styles.progressItem}>
-            <View style={styles.progressIcon}>
-              <Text style={styles.progressIconText}>✅</Text>
+          <View style={styles.tripProgressContainer}>
+            {/* Start Trip */}
+            <View style={styles.progressStep}>
+              <View style={styles.progressStepContent}>
+                <View style={[
+                  styles.progressIcon,
+                  (task.status !== 'pending' && task.status !== 'assigned') ? styles.progressIconCompleted : styles.progressIconPending
+                ]}>
+                  <Text style={[
+                    styles.progressIconText,
+                    (task.status !== 'pending' && task.status !== 'assigned') && styles.progressIconTextCompleted
+                  ]}>
+                    {(task.status !== 'pending' && task.status !== 'assigned') ? '✓' : '🚛'}
+                  </Text>
+                </View>
+                <View style={styles.progressLabelContainer}>
+                  <Text style={[
+                    styles.progressLabel,
+                    (task.status !== 'pending' && task.status !== 'assigned') && styles.progressLabelCompleted
+                  ]}>
+                    Start Trip
+                  </Text>
+                </View>
+              </View>
+              <View style={[
+                styles.progressConnector,
+                (task.status !== 'pending' && task.status !== 'assigned') && styles.progressConnectorActive
+              ]} />
             </View>
-            <Text style={styles.progressText}>Start Trip</Text>
-            {order.status !== 'Start Trip' && (
-              <View style={styles.progressDot} />
-            )}
+
+          {/* In Transit */}
+          {(task.status === 'in_progress' || task.status === 'picked_up' || task.status === 'in_transit' || 
+            task.status === 'arrived' || task.status === 'arrived_at_destination' || task.status === 'completed' || task.status === 'delivered') && (
+            <View style={styles.progressStep}>
+              <View style={[
+                styles.progressIcon,
+                (task.status === 'in_progress' || task.status === 'picked_up' || task.status === 'in_transit') && styles.progressIconCurrent,
+                (task.status === 'arrived' || task.status === 'arrived_at_destination' || task.status === 'completed' || task.status === 'delivered') && styles.progressIconCompleted
+              ]}>
+                <Text style={[
+                  styles.progressIconText,
+                  (task.status === 'in_progress' || task.status === 'picked_up' || task.status === 'in_transit' || 
+                   task.status === 'arrived' || task.status === 'arrived_at_destination' || task.status === 'completed' || task.status === 'delivered') && styles.progressIconTextCompleted
+                ]}>
+                  �
+                </Text>
+              </View>
+              <Text style={[
+                styles.progressLabel,
+                (task.status === 'in_progress' || task.status === 'picked_up' || task.status === 'in_transit') && styles.progressLabelCurrent,
+                (task.status === 'arrived' || task.status === 'arrived_at_destination' || task.status === 'completed' || task.status === 'delivered') && styles.progressLabelCompleted
+              ]}>
+                In Transit
+              </Text>
+              <View style={[
+                styles.progressIndicator,
+                (task.status === 'in_progress' || task.status === 'picked_up' || task.status === 'in_transit') && styles.progressIndicatorCurrent
+              ]} />
+            </View>
+          )}
+
+          {/* Arrived at Destination */}
+          {(task.status === 'arrived' || task.status === 'arrived_at_destination' || task.status === 'completed' || task.status === 'delivered') && (
+            <View style={styles.progressStep}>
+              <View style={[
+                styles.progressIcon,
+                (task.status === 'arrived' || task.status === 'arrived_at_destination') && styles.progressIconCurrent,
+                (task.status === 'completed' || task.status === 'delivered') && styles.progressIconCompleted
+              ]}>
+                <Text style={[
+                  styles.progressIconText,
+                  (task.status === 'arrived' || task.status === 'arrived_at_destination' || task.status === 'completed' || task.status === 'delivered') && styles.progressIconTextCompleted
+                ]}>
+                  📍
+                </Text>
+              </View>
+              <Text style={[
+                styles.progressLabel,
+                (task.status === 'arrived' || task.status === 'arrived_at_destination') && styles.progressLabelCurrent,
+                (task.status === 'completed' || task.status === 'delivered') && styles.progressLabelCompleted
+              ]}>
+                Arrived at Destination
+              </Text>
+              <View style={[
+                styles.progressIndicator,
+                (task.status === 'arrived' || task.status === 'arrived_at_destination') && styles.progressIndicatorCurrent
+              ]} />
+            </View>
+          )}
+
+          {/* Delivered */}
+          {(task.status === 'completed' || task.status === 'delivered') && (
+            <View style={styles.progressStep}>
+              <View style={[styles.progressIcon, styles.progressIconCompleted]}>
+                <Text style={[styles.progressIconText, styles.progressIconTextCompleted]}>✓</Text>
+              </View>
+              <Text style={[styles.progressLabel, styles.progressLabelCompleted]}>Delivered</Text>
+              <View style={[styles.progressIndicator, styles.progressIndicatorCurrent]} />
+            </View>
+          )}
           </View>
-
-          {order.status === 'In Transit' && (
-            <View style={styles.progressItem}>
-              <View style={[styles.progressIcon, styles.activeProgressIcon]}>
-                <Text style={styles.progressIconText}>🚛</Text>
-              </View>
-              <Text style={[styles.progressText, styles.activeProgressText]}>In Transit</Text>
-              <View style={[styles.progressDot, styles.activeProgressDot]} />
-            </View>
-          )}
-
-          {order.status === 'Arrived at Destination' && (
-            <>
-              <View style={styles.progressItem}>
-                <View style={styles.progressIcon}>
-                  <Text style={styles.progressIconText}>✅</Text>
-                </View>
-                <Text style={styles.progressText}>In Transit</Text>
-                <View style={styles.progressDot} />
-              </View>
-              <View style={styles.progressItem}>
-                <View style={[styles.progressIcon, styles.activeProgressIcon]}>
-                  <Text style={styles.progressIconText}>📍</Text>
-                </View>
-                <Text style={[styles.progressText, styles.activeProgressText]}>Arrived at Destination</Text>
-                <View style={[styles.progressDot, styles.activeProgressDot]} />
-              </View>
-            </>
-          )}
         </View>
 
-        {/* Action Button */}
-        {getStatusButton()}
-
-        <View style={styles.bottomSpacing} />
+        {/* Notes */}
+        <View style={styles.notesContainer}>
+          <Text style={styles.sectionTitle}>Notes</Text>
+          <TextInput
+            style={styles.notesInput}
+            multiline
+            placeholder="Add any notes or observations..."
+            value={notes}
+            onChangeText={setNotes}
+          />
+          <TouchableOpacity style={styles.reportIssueButton} onPress={handleReportIssue}>
+            <Text style={styles.reportIssueIcon}>⚠️</Text>
+            <Text style={styles.reportIssueText}>Report Issue</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+
+      {/* Action Button */}
+      {(task.status !== 'completed' && task.status !== 'delivered' && task.status !== 'cancelled') && (
+        <View style={styles.bottomContainer}>
+          <TouchableOpacity
+            style={[styles.actionButton, {backgroundColor: getActionButtonColor()}]}
+            onPress={handleActionPress}
+            disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <>
+                <Text style={styles.actionButtonIcon}>{getActionButtonIcon()}</Text>
+                <Text style={styles.actionButtonText}>{getActionButtonText()}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -248,71 +457,68 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({ route, navigati
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f5f5f5',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f4',
+    borderBottomColor: '#e0e0e0',
   },
   backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 8,
   },
-  backButtonText: {
+  backIcon: {
     fontSize: 24,
-    color: '#1a1a1a',
-    fontWeight: '600',
+    color: '#007AFF',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: '#000',
     flex: 1,
     textAlign: 'center',
-    marginHorizontal: 16,
+    marginRight: 40,
   },
-  headerButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
-  inTransitButton: {
-    backgroundColor: '#007AFF',
-  },
-  arrivedHeaderButton: {
-    backgroundColor: '#007AFF',
-  },
-  headerButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
+  statusBadgeText: {
+    color: 'white',
+    fontSize: 12,
     fontWeight: '600',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
+    padding: 16,
   },
-  section: {
-    marginTop: 24,
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 20,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 16,
   },
   detailsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 20,
   },
   detailItem: {
     width: '48%',
@@ -320,157 +526,274 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 14,
-    color: '#6c757d',
+    color: '#666',
     marginBottom: 4,
   },
   detailValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: '#000',
+  },
+  simplifiedDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  simplifiedDistance: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#000',
+  },
+  simplifiedDuration: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#000',
   },
   scheduledContainer: {
-    marginTop: 8,
-  },
-  scheduledRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  scheduledValue: {
+  scheduledInfo: {
+    flex: 1,
+  },
+  scheduledLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  scheduledTime: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
-    flex: 1,
+    color: '#000',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
   },
   callButton: {
     width: 40,
     height: 40,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 12,
-  },
-  callIcon: {
-    fontSize: 16,
   },
   alertButton: {
     width: 40,
     height: 40,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
+  },
+  callIcon: {
+    fontSize: 20,
   },
   alertIcon: {
-    fontSize: 16,
+    fontSize: 20,
+  },
+  addressesContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   addressItem: {
-    marginBottom: 24,
-  },
-  addressHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
-  pickupDot: {
-    fontSize: 12,
-    marginRight: 8,
+  addressDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 12,
+    marginTop: 4,
   },
-  deliveryDot: {
-    fontSize: 12,
-    marginRight: 8,
+  addressInfo: {
+    flex: 1,
   },
   addressLabel: {
     fontSize: 14,
-    color: '#6c757d',
-    fontWeight: '600',
+    color: '#666',
+    marginBottom: 4,
   },
-  addressValue: {
+  addressText: {
     fontSize: 16,
-    color: '#1a1a1a',
+    color: '#000',
     lineHeight: 22,
   },
-  progressItem: {
+  notesContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  notesInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  reportIssueButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#fff3cd',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ffeaa7',
+  },
+  reportIssueIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  reportIssueText: {
+    fontSize: 16,
+    color: '#856404',
+    fontWeight: '500',
+  },
+  bottomContainer: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    minHeight: 54,
+  },
+  actionButtonIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  actionButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  tripProgressContainer: {
+    paddingVertical: 0,
+  },
+  progressStep: {
+    marginBottom: 20,
+  },
+  progressStepContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   progressIcon: {
     width: 40,
     height: 40,
-    backgroundColor: '#f8f9fa',
     borderRadius: 20,
-    justifyContent: 'center',
+    backgroundColor: '#f5f5f5',
     alignItems: 'center',
-    marginRight: 16,
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    marginRight: 12,
   },
-  activeProgressIcon: {
+  progressIconPending: {
+    backgroundColor: '#f5f5f5',
+    borderColor: '#e0e0e0',
+  },
+  progressIconCurrent: {
     backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  progressIconCompleted: {
+    backgroundColor: '#28a745',
+    borderColor: '#28a745',
   },
   progressIconText: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
   },
-  progressText: {
-    fontSize: 16,
-    color: '#6c757d',
+  progressIconTextCompleted: {
+    color: 'white',
+  },
+  progressLabelContainer: {
     flex: 1,
+    position: 'relative',
   },
-  activeProgressText: {
+  progressLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  progressLabelCurrent: {
     color: '#007AFF',
     fontWeight: '600',
   },
-  progressDot: {
+  progressLabelCompleted: {
+    color: '#28a745',
+    fontWeight: '600',
+  },
+  currentIndicator: {
+    position: 'absolute',
+    right: 0,
+    top: 2,
     width: 8,
     height: 8,
-    backgroundColor: '#e9ecef',
     borderRadius: 4,
-  },
-  activeProgressDot: {
     backgroundColor: '#007AFF',
   },
-  startTripButton: {
+  progressConnector: {
+    position: 'absolute',
+    left: 19,
+    top: 40,
+    width: 2,
+    height: 20,
+    backgroundColor: '#e0e0e0',
+  },
+  progressConnectorActive: {
+    backgroundColor: '#28a745',
+  },
+  progressIndicator: {
+    height: 2,
+    backgroundColor: '#e0e0e0',
+    marginTop: 4,
+    width: '80%',
+  },
+  progressIndicatorCurrent: {
     backgroundColor: '#007AFF',
-    borderRadius: 12,
-    paddingVertical: 16,
-    marginTop: 24,
-    marginHorizontal: 24,
-    alignItems: 'center',
-  },
-  startTripButtonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  arrivedButton: {
-    backgroundColor: '#34C759',
-    borderRadius: 12,
-    paddingVertical: 16,
-    marginTop: 24,
-    marginHorizontal: 24,
-    alignItems: 'center',
-  },
-  arrivedButtonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  deliveredButton: {
-    backgroundColor: '#34C759',
-    borderRadius: 12,
-    paddingVertical: 16,
-    marginTop: 24,
-    marginHorizontal: 24,
-    alignItems: 'center',
-  },
-  deliveredButtonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  bottomSpacing: {
-    height: 100,
   },
 });
 

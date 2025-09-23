@@ -139,7 +139,7 @@ class ApiClient {
 
   // Authentication methods
   async login(email: string, password: string, deviceName: string = 'React Native App') {
-    return this.makeRequest('/login', {
+    return this.makeRequest('/driver/login', {
       method: 'POST',
       body: { email, password, device_name: deviceName },
       requireAuth: false,
@@ -155,7 +155,7 @@ class ApiClient {
     password_confirmation: string;
     device_name?: string;
   }) {
-    return this.makeRequest('/register', {
+    return this.makeRequest('/driver/register', {
       method: 'POST',
       body: {
         ...data,
@@ -166,13 +166,13 @@ class ApiClient {
   }
 
   async logout() {
-    return this.makeRequest('/logout', {
+    return this.makeRequest('/driver/logout', {
       method: 'POST',
     });
   }
 
   async forgotPassword(email: string) {
-    return this.makeRequest('/forgot-password', {
+    return this.makeRequest('/driver/forgot-password', {
       method: 'POST',
       body: { email },
       requireAuth: false,
@@ -199,28 +199,38 @@ class ApiClient {
     per_page?: number;
   }) {
     const queryParams = new URLSearchParams();
-    if (params?.status) queryParams.append('status', params.status);
+    if (params?.status) {
+      // Map UI status values to API status values
+      const statusMapping = {
+        'all': 'all',
+        'pending': 'pending',
+        'in_progress': 'in_transit',
+        'completed': 'completed'
+      };
+      const apiStatus = statusMapping[params.status] || params.status;
+      queryParams.append('status', apiStatus);
+    }
     if (params?.search) queryParams.append('search', params.search);
     if (params?.per_page) queryParams.append('per_page', params.per_page.toString());
     
     const queryString = queryParams.toString();
-    const endpoint = queryString ? `/tasks?${queryString}` : '/tasks';
-    
+    const endpoint = queryString ? `/driver/tasks?${queryString}` : '/driver/tasks';
+    console.log('urlendpoint', endpoint);
     return this.makeRequest(endpoint);
   }
 
   async getTaskDetails(taskId: number) {
-    return this.makeRequest(`/tasks/${taskId}`);
+    return this.makeRequest(`/driver/tasks/${taskId}`);
   }
 
   async acceptTask(taskId: number) {
-    return this.makeRequest(`/tasks/${taskId}/accept`, {
+    return this.makeRequest(`/driver/tasks/${taskId}/accept`, {
       method: 'POST',
     });
   }
 
   async rejectTask(taskId: number, reason: string) {
-    return this.makeRequest(`/tasks/${taskId}/reject`, {
+    return this.makeRequest(`/driver/tasks/${taskId}/reject`, {
       method: 'POST',
       body: { reason },
     });
@@ -234,7 +244,7 @@ class ApiClient {
       longitude: number;
     };
   }) {
-    return this.makeRequest(`/tasks/${taskId}/status`, {
+    return this.makeRequest(`/driver/tasks/${taskId}/status`, {
       method: 'PUT',
       body: data,
     });
@@ -242,7 +252,7 @@ class ApiClient {
 
   // Profile methods
   async getProfile() {
-    return this.makeRequest('/profile');
+    return this.makeRequest('/driver/profile');
   }
 
   async updateProfile(data: {
@@ -257,7 +267,7 @@ class ApiClient {
     emergency_contact_phone?: string;
     vehicle_number?: string;
   }) {
-    return this.makeRequest('/profile', {
+    return this.makeRequest('/driver/profile', {
       method: 'PUT',
       body: data,
     });
@@ -267,14 +277,14 @@ class ApiClient {
     const formData = new FormData();
     formData.append('image', imageFile);
 
-    return this.makeRequest('/profile/upload-image', {
+    return this.makeRequest('/driver/profile/upload-image', {
       method: 'POST',
       body: formData,
     });
   }
 
   async deleteProfileImage() {
-    return this.makeRequest('/profile/image', {
+    return this.makeRequest('/driver/profile/image', {
       method: 'DELETE',
     });
   }
@@ -293,14 +303,14 @@ class ApiClient {
       }
     });
 
-    return this.makeRequest('/profile/upload-documents', {
+    return this.makeRequest('/driver/profile/upload-documents', {
       method: 'POST',
       body: formData,
     });
   }
 
   async getStatistics(period: 'week' | 'month' | 'year' = 'month') {
-    return this.makeRequest(`/profile/statistics?period=${period}`);
+    return this.makeRequest(`/driver/profile/statistics?period=${period}`);
   }
 
   async updatePreferences(preferences: {
@@ -311,7 +321,7 @@ class ApiClient {
     preferred_language?: 'en' | 'es' | 'fr' | 'de';
     timezone?: string;
   }) {
-    return this.makeRequest('/profile/preferences', {
+    return this.makeRequest('/driver/profile/preferences', {
       method: 'PUT',
       body: preferences,
     });

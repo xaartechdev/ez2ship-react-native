@@ -11,15 +11,17 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { useDispatch } from 'react-redux';
 import { profileService, DriverProfile, UpdateProfileRequest } from '../services/profileService';
+import { authService } from '../services/authService';
+import { logout } from '../store/slices/authSlice';
 
 interface NavigationProps {
-  navigation: {
-    replace: (route: string) => void;
-  };
+  navigation: any;
 }
 
 const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
+  const dispatch = useDispatch();
   const [profile, setProfile] = useState<DriverProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -75,6 +77,31 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
 
   const getDisplayValue = (value: string | undefined | null): string => {
     return value && value.trim() !== '' ? value : 'N/A';
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Use Redux logout action
+              await dispatch(logout() as any);
+            } catch (error) {
+              console.error('Logout error:', error);
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (loading) {
@@ -236,6 +263,15 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
             
             <TouchableOpacity style={styles.cancelButton} onPress={handleCancelEdit}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!isEditing && (
+          <View style={styles.logoutSection}>
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+              <Text style={styles.logoutIcon}>🚪</Text>
+              <Text style={styles.logoutButtonText}>Logout</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -422,6 +458,26 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: '#6c757d',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  logoutSection: {
+    marginBottom: 32,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF3B30',
+    borderRadius: 12,
+    paddingVertical: 16,
+  },
+  logoutIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  logoutButtonText: {
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
   },
