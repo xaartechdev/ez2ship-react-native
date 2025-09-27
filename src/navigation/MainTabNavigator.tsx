@@ -6,7 +6,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import DashboardScreen from '../screens/DashboardScreen';
 import MyTasksScreen from '../screens/MyTasksScreen';
 import AlertsScreen from '../screens/AlertsScreen';
-import ProfileScreen from '../screens/ProfileScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -82,20 +82,20 @@ const MainTabNavigator: React.FC = () => {
               focused={focused}
               icon="🔔"
               label="Alerts"
-              badgeCount={2}
+              badgeCount={5}
             />
           ),
         }}
       />
       <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
+        name="Settings"
+        component={SettingsScreen}
         options={{
           tabBarIcon: ({ focused }) => (
             <TabIcon
               focused={focused}
-              icon="👤"
-              label="Profile"
+              icon="⚙️"
+              label="Settings"
             />
           ),
         }}

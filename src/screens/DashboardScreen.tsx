@@ -23,7 +23,47 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const { user } = useSelector((state: RootState) => state.auth);
+
+  // Get dynamic greeting based on current time
+  const getGreeting = () => {
+    const hour = currentTime.getHours();
+    
+    if (hour >= 5 && hour < 12) {
+      return 'Good morning';
+    } else if (hour >= 12 && hour < 17) {
+      return 'Good afternoon';
+    } else if (hour >= 17 && hour < 22) {
+      return 'Good evening';
+    } else {
+      return 'Good night';
+    }
+  };
+
+  // Get dynamic subtitle based on time of day
+  const getSubtitle = () => {
+    const hour = currentTime.getHours();
+    
+    if (hour >= 5 && hour < 12) {
+      return 'Ready for your deliveries?';
+    } else if (hour >= 12 && hour < 17) {
+      return 'How are your deliveries going?';
+    } else if (hour >= 17 && hour < 22) {
+      return 'Finishing up your deliveries?';
+    } else {
+      return 'Time to rest after a good day!';
+    }
+  };
+
+  // Update time every minute to keep greeting current
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(timer);
+  }, []);
 
   // Get user name
   useEffect(() => {
@@ -85,8 +125,8 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <View>
-              <Text style={styles.greeting}>Good morning, {userName}</Text>
-              <Text style={styles.subtitle}>Ready for your deliveries?</Text>
+              <Text style={styles.greeting}>{getGreeting()}, {userName}</Text>
+              <Text style={styles.subtitle}>{getSubtitle()}</Text>
             </View>
           </View>
         </View>

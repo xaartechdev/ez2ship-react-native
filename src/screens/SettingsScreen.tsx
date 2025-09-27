@@ -1,16 +1,21 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Switch,
+  Image,
+  SafeAreaView,
+  StatusBar,
   Alert,
 } from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { useNavigation } from '@react-navigation/native';
 import { AppDispatch, RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
+import { fetchProfile } from '../store/slices/profileSlice';
+import { authService } from '../services/authService';
 
 interface SettingsScreenProps {
   navigation: any;
@@ -19,6 +24,20 @@ interface SettingsScreenProps {
 const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
+  const { profile } = useSelector((state: RootState) => state.profile);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Fetch profile data when component mounts
+    dispatch(fetchProfile());
+  }, [dispatch]);
+
+  useEffect(() => {
+    // Load profile image if available
+    if (profile?.profile_image) {
+      setProfileImage(profile.profile_image);
+    }
+  }, [profile]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -31,14 +50,15 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await dispatch(logout()).unwrap();
+              await authService.logout();
+              dispatch(logout());
               navigation.reset({
                 index: 0,
                 routes: [{ name: 'Auth' }],
               });
             } catch (error) {
               console.error('Logout error:', error);
-              // Still navigate even if API call fails
+              dispatch(logout()); // Force logout even if API fails
               navigation.reset({
                 index: 0,
                 routes: [{ name: 'Auth' }],
@@ -50,219 +70,114 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     );
   };
 
-  const SettingItem: React.FC<{
-    title: string;
-    subtitle?: string;
-    onPress?: () => void;
-    rightElement?: React.ReactNode;
-    showArrow?: boolean;
-  }> = ({ title, subtitle, onPress, rightElement, showArrow = true }) => (
-    <TouchableOpacity 
-      style={styles.settingItem} 
-      onPress={onPress}
-      disabled={!onPress}
-    >
-      <View style={styles.settingItemLeft}>
-        <Text style={styles.settingTitle}>{title}</Text>
-        {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
-      </View>
-      <View style={styles.settingItemRight}>
-        {rightElement}
-        {showArrow && onPress && (
-          <Text style={styles.arrow}>›</Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+  const navigateToProfile = () => {
+    console.log('Navigating to ProfileView...');
+    navigation.navigate('ProfileView');
+  };
 
-  const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
-    <Text style={styles.sectionHeader}>{title}</Text>
-  );
+  const navigateToChangePassword = () => {
+    console.log('Navigating to ChangePassword...');
+    navigation.navigate('ChangePassword');
+  };
+
+  const navigateToVehicleInfo = () => {
+    console.log('Navigating to VehicleInformation...');
+    navigation.navigate('VehicleInformation');
+  };
+
+  const getInitials = (firstName?: string, lastName?: string) => {
+    if (!firstName && !lastName) return 'U';
+    const first = firstName ? firstName.charAt(0).toUpperCase() : '';
+    const last = lastName ? lastName.charAt(0).toUpperCase() : '';
+    return `${first}${last}` || 'U';
+  };
+
+  const getFullName = () => {
+    if (profile?.first_name || profile?.last_name) {
+      return `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
+    }
+    return 'User';
+  };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Settings</Text>
-        <Text style={styles.headerSubtitle}>
-          Manage your app preferences
-        </Text>
-      </View>
-
-      <View style={styles.content}>
-        {/* Account Section */}
-        <SectionHeader title="Account" />
-        <View style={styles.section}>
-          <SettingItem
-            title="Profile Information"
-            subtitle="Update your personal details"
-            onPress={() => {
-              // Navigate to profile edit
-              Alert.alert('Info', 'Profile editing will be available soon');
-            }}
-          />
-          <SettingItem
-            title="Change Password"
-            subtitle="Update your account password"
-            onPress={() => {
-              Alert.alert('Info', 'Password change will be available soon');
-            }}
-          />
-          <SettingItem
-            title="Account Status"
-            subtitle={user?.status === 'active' ? 'Active' : 'Inactive'}
-            showArrow={false}
-            rightElement={
-              <View style={[
-                styles.statusBadge, 
-                { backgroundColor: user?.status === 'active' ? '#28a745' : '#dc3545' }
-              ]}>
-                <Text style={styles.statusText}>
-                  {user?.status === 'active' ? 'Active' : 'Inactive'}
-                </Text>
-              </View>
-            }
-          />
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Header with Profile Info */}
+        <View style={styles.header}>
+          <View style={styles.profileSection}>
+            <View style={styles.profileImageContainer}>
+              {profileImage ? (
+                <Image source={{ uri: profileImage }} style={styles.profileImage} />
+              ) : (
+                <View style={styles.profileImagePlaceholder}>
+                  <Text style={styles.profileImageText}>
+                    {getInitials(profile?.first_name, profile?.last_name)}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>{getFullName()}</Text>
+              <Text style={styles.profileSubtitle}>Driver Account</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Notifications Section */}
-        <SectionHeader title="Notifications" />
-        <View style={styles.section}>
-          <SettingItem
-            title="Push Notifications"
-            subtitle="Receive push notifications"
-            showArrow={false}
-            rightElement={
-              <Switch
-                value={true}
-                onValueChange={(value) => {
-                  // Update notification setting
-                  console.log('Push notifications:', value);
-                }}
-              />
-            }
-          />
-          <SettingItem
-            title="Email Notifications"
-            subtitle="Receive email updates"
-            showArrow={false}
-            rightElement={
-              <Switch
-                value={true}
-                onValueChange={(value) => {
-                  console.log('Email notifications:', value);
-                }}
-              />
-            }
-          />
-          <SettingItem
-            title="Order Updates"
-            subtitle="Get notified about order changes"
-            showArrow={false}
-            rightElement={
-              <Switch
-                value={true}
-                onValueChange={(value) => {
-                  console.log('Order updates:', value);
-                }}
-              />
-            }
-          />
-        </View>
+        {/* Settings Options */}
+        <View style={styles.settingsSection}>
+          {/* Profile Option */}
+          <TouchableOpacity style={styles.settingItem} onPress={navigateToProfile}>
+            <View style={styles.settingIcon}>
+              <Text style={styles.settingIconText}>👤</Text>
+            </View>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingTitle}>Profile</Text>
+              <Text style={styles.settingSubtitle}>View and edit your profile</Text>
+            </View>
+            <Text style={styles.settingArrow}>›</Text>
+          </TouchableOpacity>
 
-        {/* App Preferences */}
-        <SectionHeader title="App Preferences" />
-        <View style={styles.section}>
-          <SettingItem
-            title="Language"
-            subtitle="English (US)"
-            onPress={() => {
-              Alert.alert('Info', 'Language selection will be available soon');
-            }}
-          />
-          <SettingItem
-            title="Theme"
-            subtitle="Light Mode"
-            onPress={() => {
-              Alert.alert('Info', 'Theme selection will be available soon');
-            }}
-          />
-          <SettingItem
-            title="Map Preferences"
-            subtitle="Configure map settings"
-            onPress={() => {
-              Alert.alert('Info', 'Map preferences will be available soon');
-            }}
-          />
-        </View>
+          {/* Change Password Option */}
+          <TouchableOpacity style={styles.settingItem} onPress={navigateToChangePassword}>
+            <View style={styles.settingIcon}>
+              <Text style={styles.settingIconText}>🔒</Text>
+            </View>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingTitle}>Change Password</Text>
+              <Text style={styles.settingSubtitle}>Update your account password</Text>
+            </View>
+            <Text style={styles.settingArrow}>›</Text>
+          </TouchableOpacity>
 
-        {/* Support Section */}
-        <SectionHeader title="Support" />
-        <View style={styles.section}>
-          <SettingItem
-            title="Help Center"
-            subtitle="Get help and support"
-            onPress={() => {
-              Alert.alert('Info', 'Help center will be available soon');
-            }}
-          />
-          <SettingItem
-            title="Contact Support"
-            subtitle="Get in touch with our team"
-            onPress={() => {
-              Alert.alert('Info', 'Contact support will be available soon');
-            }}
-          />
-          <SettingItem
-            title="Report a Bug"
-            subtitle="Help us improve the app"
-            onPress={() => {
-              Alert.alert('Info', 'Bug reporting will be available soon');
-            }}
-          />
-          <SettingItem
-            title="Rate the App"
-            subtitle="Share your feedback"
-            onPress={() => {
-              Alert.alert('Info', 'App rating will be available soon');
-            }}
-          />
-        </View>
-
-        {/* About Section */}
-        <SectionHeader title="About" />
-        <View style={styles.section}>
-          <SettingItem
-            title="App Version"
-            subtitle="1.0.0"
-            showArrow={false}
-          />
-          <SettingItem
-            title="Terms of Service"
-            onPress={() => {
-              Alert.alert('Info', 'Terms of service will be available soon');
-            }}
-          />
-          <SettingItem
-            title="Privacy Policy"
-            onPress={() => {
-              Alert.alert('Info', 'Privacy policy will be available soon');
-            }}
-          />
+          {/* Vehicle Information Option */}
+          <TouchableOpacity style={styles.settingItem} onPress={navigateToVehicleInfo}>
+            <View style={styles.settingIcon}>
+              <Text style={styles.settingIconText}>🚚</Text>
+            </View>
+            <View style={styles.settingContent}>
+              <Text style={styles.settingTitle}>Vehicle Information</Text>
+              <Text style={styles.settingSubtitle}>View your vehicle details</Text>
+            </View>
+            <Text style={styles.settingArrow}>›</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Logout Section */}
-        <View style={styles.section}>
-          <TouchableOpacity 
-            style={styles.logoutButton}
-            onPress={handleLogout}
-          >
+        <View style={styles.logoutSection}>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <View style={styles.logoutIcon}>
+              <Text style={styles.logoutIconText}>🚪</Text>
+            </View>
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
         </View>
 
+        {/* Bottom spacing for tab bar */}
         <View style={styles.bottomSpacing} />
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -271,102 +186,129 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
+  scrollView: {
+    flex: 1,
+  },
   header: {
     backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    paddingTop: 20,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
+    marginBottom: 12,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#212529',
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  profileImageContainer: {
+    marginRight: 16,
+  },
+  profileImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+  },
+  profileImagePlaceholder: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileImageText: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1a1a1a',
     marginBottom: 4,
   },
-  headerSubtitle: {
+  profileSubtitle: {
     fontSize: 16,
     color: '#6c757d',
   },
-  content: {
-    flex: 1,
-  },
-  sectionHeader: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#495057',
-    marginTop: 24,
-    marginBottom: 8,
-    marginHorizontal: 20,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  section: {
+  settingsSection: {
     backgroundColor: '#ffffff',
     marginHorizontal: 16,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    paddingVertical: 8,
+    marginBottom: 24,
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f3f4',
   },
-  settingItemLeft: {
-    flex: 1,
-  },
-  settingItemRight: {
-    flexDirection: 'row',
+  settingIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 16,
+  },
+  settingIconText: {
+    fontSize: 20,
+  },
+  settingContent: {
+    flex: 1,
   },
   settingTitle: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#212529',
+    fontWeight: '600',
+    color: '#1a1a1a',
     marginBottom: 2,
   },
   settingSubtitle: {
     fontSize: 14,
     color: '#6c757d',
   },
-  arrow: {
+  settingArrow: {
     fontSize: 20,
-    color: '#adb5bd',
-    marginLeft: 8,
+    color: '#6c757d',
+    fontWeight: '300',
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#ffffff',
+  logoutSection: {
+    marginHorizontal: 16,
+    marginBottom: 32,
   },
   logoutButton: {
-    backgroundColor: '#dc3545',
-    marginHorizontal: 16,
-    marginVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
     paddingVertical: 16,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+  },
+  logoutIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFE5E5',
+    justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 16,
+  },
+  logoutIconText: {
+    fontSize: 20,
   },
   logoutText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#FF3B30',
   },
   bottomSpacing: {
     height: 100,

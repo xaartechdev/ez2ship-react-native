@@ -9,10 +9,13 @@ import { RootState } from '../store';
 // Screens
 import LoginScreen from '../screens/LoginScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
+import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import MyTasksScreen from '../screens/MyTasksScreen';
 import AlertsScreen from '../screens/AlertsScreen';
-import ProfileScreen from '../screens/ProfileScreen';
+import SettingsScreen from '../screens/SettingsScreen';
+import ProfileViewScreen from '../screens/ProfileViewScreen';
+import VehicleInformationScreen from '../screens/VehicleInformationScreen';
 import OrderDetailsScreen from '../screens/OrderDetailsScreen';
 import TripProgressScreen from '../screens/TripProgressScreen';
 import ProofOfDeliveryScreen from '../screens/ProofOfDeliveryScreen';
@@ -50,7 +53,7 @@ const MainTabNavigator = () => {
       }}
     >
       <Tab.Screen
-        name="Dashboard"
+        name="Home"
         component={DashboardScreen}
         options={{
           tabBarIcon: ({ color }) => (
@@ -59,11 +62,11 @@ const MainTabNavigator = () => {
         }}
       />
       <Tab.Screen
-        name="My Tasks"
+        name="Orders"
         component={MyTasksScreen}
         options={{
           tabBarIcon: ({ color }) => (
-            <TabIcon icon="📋" color={color} />
+            <TabIcon icon="�" color={color} />
           ),
         }}
       />
@@ -74,15 +77,15 @@ const MainTabNavigator = () => {
           tabBarIcon: ({ color }) => (
             <TabIcon icon="🔔" color={color} />
           ),
-          tabBarBadge: 2,
+          tabBarBadge: 5,
         }}
       />
       <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
+        name="Settings"
+        component={SettingsScreen}
         options={{
           tabBarIcon: ({ color }) => (
-            <TabIcon icon="👤" color={color} />
+            <TabIcon icon="⚙️" color={color} />
           ),
         }}
       />
@@ -113,6 +116,33 @@ const AppStackNavigator = () => {
       }}
     >
       <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+      <Stack.Screen 
+        name="ProfileView" 
+        component={ProfileViewScreen}
+        options={{
+          presentation: 'card',
+          headerShown: false,
+          gestureEnabled: true,
+        }}
+      />
+      <Stack.Screen 
+        name="ChangePassword" 
+        component={ChangePasswordScreen}
+        options={{
+          presentation: 'card',
+          headerShown: false,
+          gestureEnabled: true,
+        }}
+      />
+      <Stack.Screen 
+        name="VehicleInformation" 
+        component={VehicleInformationScreen}
+        options={{
+          presentation: 'card',
+          headerShown: false,
+          gestureEnabled: true,
+        }}
+      />
       <Stack.Screen 
         name="OrderDetails" 
         component={OrderDetailsScreen}

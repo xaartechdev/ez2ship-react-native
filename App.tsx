@@ -11,7 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
 import 'react-native-gesture-handler';
 
-import { store } from './src/store';
+import store from './src/store';
 import { loadUserFromStorage } from './src/store/slices/authSlice';
 import AppNavigator from './src/navigation/RootNavigator';
 import { ErrorBoundary } from './src/components/common';
