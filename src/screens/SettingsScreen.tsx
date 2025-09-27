@@ -184,7 +184,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#ffffff',
   },
   scrollView: {
     flex: 1,
@@ -194,7 +194,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 24,
     paddingHorizontal: 24,
-    marginBottom: 12,
   },
   profileSection: {
     flexDirection: 'row',
@@ -236,10 +235,12 @@ const styles = StyleSheet.create({
   },
   settingsSection: {
     backgroundColor: '#ffffff',
-    marginHorizontal: 16,
-    borderRadius: 12,
-    paddingVertical: 8,
-    marginBottom: 24,
+    marginHorizontal: 0,
+    borderRadius: 0,
+    paddingVertical: 0,
+    marginBottom: 0,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f3f4',
   },
   settingItem: {
     flexDirection: 'row',
@@ -280,18 +281,18 @@ const styles = StyleSheet.create({
     fontWeight: '300',
   },
   logoutSection: {
-    marginHorizontal: 16,
-    marginBottom: 32,
+    marginTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f3f4',
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FF3B30',
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f3f4',
   },
   logoutIcon: {
     width: 40,
