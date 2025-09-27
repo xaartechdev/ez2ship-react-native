@@ -6,10 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  SafeAreaView,
   StatusBar,
   Alert,
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { AppDispatch, RootState } from '../store';
@@ -23,17 +24,14 @@ interface SettingsScreenProps {
 
 const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   const dispatch = useDispatch<AppDispatch>();
-  const { user } = useSelector((state: RootState) => state.auth);
   const { profile } = useSelector((state: RootState) => state.profile);
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
   useEffect(() => {
-    // Fetch profile data when component mounts
     dispatch(fetchProfile());
   }, [dispatch]);
 
   useEffect(() => {
-    // Load profile image if available
     if (profile?.profile_image) {
       setProfileImage(profile.profile_image);
     }
@@ -45,8 +43,8 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       'Are you sure you want to logout?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
+        {
+          text: 'Logout',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -58,30 +56,27 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
               });
             } catch (error) {
               console.error('Logout error:', error);
-              dispatch(logout()); // Force logout even if API fails
+              dispatch(logout());
               navigation.reset({
                 index: 0,
                 routes: [{ name: 'Auth' }],
               });
             }
-          }
+          },
         },
       ]
     );
   };
 
   const navigateToProfile = () => {
-    console.log('Navigating to ProfileView...');
     navigation.navigate('ProfileView');
   };
 
   const navigateToChangePassword = () => {
-    console.log('Navigating to ChangePassword...');
     navigation.navigate('ChangePassword');
   };
 
   const navigateToVehicleInfo = () => {
-    console.log('Navigating to VehicleInformation...');
     navigation.navigate('VehicleInformation');
   };
 
@@ -100,33 +95,39 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header with Profile Info */}
-        <View style={styles.header}>
-          <View style={styles.profileSection}>
-            <View style={styles.profileImageContainer}>
-              {profileImage ? (
-                <Image source={{ uri: profileImage }} style={styles.profileImage} />
-              ) : (
-                <View style={styles.profileImagePlaceholder}>
-                  <Text style={styles.profileImageText}>
-                    {getInitials(profile?.first_name, profile?.last_name)}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{getFullName()}</Text>
-              <Text style={styles.profileSubtitle}>Driver Account</Text>
-            </View>
-          </View>
-        </View>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-        {/* Settings Options */}
-        <View style={styles.settingsSection}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Settings</Text>
+      </View>
+
+      {/* Profile Section */}
+      <View style={styles.profileSection}>
+        <View style={styles.profileImageContainer}>
+          {profileImage ? (
+            <Image source={{ uri: profileImage }} style={styles.profileImage} />
+          ) : (
+            <View style={styles.profileImagePlaceholder}>
+              <Text style={styles.profileImageText}>
+                {getInitials(profile?.first_name, profile?.last_name)}
+              </Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.profileInfo}>
+          <Text style={styles.profileName}>{getFullName()}</Text>
+          <Text style={styles.profileSubtitle}>Driver Account</Text>
+        </View>
+      </View>
+
+      {/* Settings Options */}
+      <View style={styles.settingsLabelContainer}>
+        <Text style={styles.settingsLabel}>Settings</Text>
+      </View>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.settingsContainer}>
           {/* Profile Option */}
           <TouchableOpacity style={styles.settingItem} onPress={navigateToProfile}>
             <View style={styles.settingIcon}>
@@ -162,20 +163,19 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
             </View>
             <Text style={styles.settingArrow}>›</Text>
           </TouchableOpacity>
-        </View>
 
-        {/* Logout Section */}
-        <View style={styles.logoutSection}>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <View style={styles.logoutIcon}>
-              <Text style={styles.logoutIconText}>🚪</Text>
+          {/* Logout Option */}
+          <TouchableOpacity style={styles.settingItem} onPress={handleLogout}>
+            <View style={[styles.settingIcon, styles.logoutIconBg]}>
+              <Text style={styles.settingIconText}>🚪</Text>
             </View>
-            <Text style={styles.logoutText}>Logout</Text>
+            <View style={styles.settingContent}>
+              <Text style={[styles.settingTitle, styles.logoutText]}>Logout</Text>
+              <Text style={styles.settingSubtitle}>Sign out of your account</Text>
+            </View>
+            <Text style={styles.settingArrow}>›</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Bottom spacing for tab bar */}
-        <View style={styles.bottomSpacing} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -184,20 +184,26 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  scrollView: {
-    flex: 1,
+    backgroundColor: '#F5F5F5',
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
-    backgroundColor: '#ffffff',
-    paddingTop: 20,
-    paddingBottom: 24,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#FFF',
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#000',
   },
   profileSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#FFF',
+    marginBottom: 12,
   },
   profileImageContainer: {
     marginRight: 16,
@@ -233,14 +239,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6c757d',
   },
-  settingsSection: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 0,
-    borderRadius: 0,
-    paddingVertical: 0,
-    marginBottom: 0,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f3f4',
+  settingsLabelContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    backgroundColor: '#F5F5F5',
+  },
+  settingsLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#666',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  settingsContainer: {
+    backgroundColor: '#FFF',
   },
   settingItem: {
     flexDirection: 'row',
@@ -280,39 +295,11 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     fontWeight: '300',
   },
-  logoutSection: {
-    marginTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f3f4',
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 24,
-    paddingVertical: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f4',
-  },
-  logoutIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  logoutIconBg: {
     backgroundColor: '#FFE5E5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  logoutIconText: {
-    fontSize: 20,
   },
   logoutText: {
-    fontSize: 16,
-    fontWeight: '600',
     color: '#FF3B30',
-  },
-  bottomSpacing: {
-    height: 100,
   },
 });
 

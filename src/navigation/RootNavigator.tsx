@@ -14,6 +14,7 @@ import DashboardScreen from '../screens/DashboardScreen';
 import MyTasksScreen from '../screens/MyTasksScreen';
 import AlertsScreen from '../screens/AlertsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 import ProfileViewScreen from '../screens/ProfileViewScreen';
 import VehicleInformationScreen from '../screens/VehicleInformationScreen';
 import OrderDetailsScreen from '../screens/OrderDetailsScreen';
@@ -118,7 +119,7 @@ const AppStackNavigator = () => {
       <Stack.Screen name="MainTabs" component={MainTabNavigator} />
       <Stack.Screen 
         name="ProfileView" 
-        component={ProfileViewScreen}
+        component={ProfileScreen}
         options={{
           presentation: 'card',
           headerShown: false,
