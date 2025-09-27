@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
+import { useFocusEffect } from '@react-navigation/native';
 import { RootState, AppDispatch } from '../store';
 import {
   fetchTasks,
@@ -38,33 +39,28 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
   >('pending');
 
   useEffect(() => {
-    dispatch(fetchTasks({}));
+    // Load pending tasks by default when component mounts
+    dispatch(fetchTasks({ status: 'pending' }));
   }, [dispatch]);
+
+  // Refresh data when screen comes into focus (e.g., returning from OrderDetails)
+  useFocusEffect(
+    React.useCallback(() => {
+      dispatch(fetchTasks({ status: activeFilter }));
+    }, [dispatch, activeFilter])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await dispatch(fetchTasks({}));
+    // Use current active filter when refreshing
+    await dispatch(fetchTasks({ status: activeFilter }));
     setRefreshing(false);
   };
 
-  // Count tasks
-  const pendingCount = tasks.filter(
-    (task) =>
-      task.status === 'pending' ||
-      task.status === '' ||
-      task.status === 'assigned'
-  ).length;
-
-  const inProgressCount = tasks.filter(
-    (task) =>
-      task.status === 'in_progress' ||
-      task.status === 'picked_up' ||
-      task.status === 'in_transit'
-  ).length;
-
-  const completedCount = tasks.filter(
-    (task) => task.status === 'delivered' || task.status === 'cancelled'
-  ).length;
+  // Use counts from API summary instead of calculating locally
+  const pendingCount = summary?.pending || 0;
+  const inProgressCount = summary?.in_progress || 0;
+  const completedCount = summary?.completed || 0;
 
   const filteredTasks = tasks.filter((task) => {
     let matchesFilter = false;
@@ -83,7 +79,9 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
         break;
       case 'completed':
         matchesFilter =
-          task.status === 'delivered' || task.status === 'cancelled';
+          task.status === 'delivered' || 
+          task.status === 'cancelled' || 
+          task.status === 'completed';
         break;
       default:
         matchesFilter = true;

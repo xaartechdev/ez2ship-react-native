@@ -1,28 +1,381 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';import { createSlice, PayloadAction } from '@reduxjs/toolkit';import { createSlice, PayloadAction } from '@reduxjs/toolkit';import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';import { createSlice, PayloadAction } from '@reduxjs/toolkit';import { createSlice, PayloadAction } from '@reduxjs/toolkit';import { createSlice, PayloadAction } from '@reduxjs/toolkit';import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+
+import { profileService, DriverProfile, UpdateProfileRequest, ChangePasswordRequest } from '../../services/profileService';
+
+import { profileService, DriverProfile, UpdateProfileRequest, ChangePasswordRequest } from '../../services/profileService';
+
+export interface ProfileState {
+
+  profile: DriverProfile | null;
+
+  loading: boolean;
+
+  updating: boolean;export interface ProfileState {
+
+  uploading: boolean;
+
+  error: string | null;  profile: DriverProfile | null;interface ProfileState {
+
+  updateSuccess: boolean;
+
+}  loading: boolean;
 
 
 
-interface ProfileState {
+const initialState: ProfileState = {  updating: boolean;  user: any | null;
 
-  user: any | null;
+  profile: null,
 
-  loading: boolean;export interface ProfileState {
+  loading: false,  uploading: boolean;
 
-  error: string | null;
+  updating: false,
 
-}  user: any | null;
-
-
-
-const initialState: ProfileState = {  loading: boolean;export interface ProfileState {import { profileService, DriverProfile, UpdateProfileRequest, ChangePasswordRequest } from '../../services/profileService';import { profileService, DriverProfile, UpdateProfileRequest, ChangePasswordRequest } from '../../services/profileService';
-
-  user: null,
-
-  loading: false,  error: string | null;
+  uploading: false,  error: string | null;  loading: boolean;export interface ProfileState {
 
   error: null,
 
-};}  profile: any | null;
+  updateSuccess: false,  updateSuccess: boolean;
+
+};
+
+}  error: string | null;
+
+// Fetch profile
+
+export const fetchProfile = createAsyncThunk(
+
+  'profile/fetchProfile',
+
+  async (_, { rejectWithValue }) => {const initialState: ProfileState = {}  user: any | null;
+
+    try {
+
+      console.log('API Request: Fetching driver profile');  profile: null,
+
+      const response = await profileService.getProfile();
+
+      console.log('API Response: Profile fetch response:', response);  loading: false,
+
+      return response;
+
+    } catch (error: any) {  updating: false,
+
+      console.log('API Error: Profile fetch error:', error.message);
+
+      return rejectWithValue(error.message);  uploading: false,const initialState: ProfileState = {  loading: boolean;export interface ProfileState {import { profileService, DriverProfile, UpdateProfileRequest, ChangePasswordRequest } from '../../services/profileService';import { profileService, DriverProfile, UpdateProfileRequest, ChangePasswordRequest } from '../../services/profileService';
+
+    }
+
+  }  error: null,
+
+);
+
+  updateSuccess: false,  user: null,
+
+// Update profile
+
+export const updateProfile = createAsyncThunk(};
+
+  'profile/updateProfile',
+
+  async (profileData: UpdateProfileRequest, { rejectWithValue }) => {  loading: false,  error: string | null;
+
+    try {
+
+      console.log('API Request: Updating profile with data:', profileData);// Fetch profile
+
+      const response = await profileService.updateProfile(profileData);
+
+      console.log('API Response: Profile update response:', response);export const fetchProfile = createAsyncThunk(  error: null,
+
+      return response;
+
+    } catch (error: any) {  'profile/fetchProfile',
+
+      console.log('API Error: Profile update error:', error.message);
+
+      return rejectWithValue(error.message);  async (_, { rejectWithValue }) => {};}  profile: any | null;
+
+    }
+
+  }    try {
+
+);
+
+      console.log('API Request: Fetching driver profile');
+
+// Change password
+
+export const changePassword = createAsyncThunk(      const response = await profileService.getProfile();
+
+  'profile/changePassword',
+
+  async (passwordData: ChangePasswordRequest, { rejectWithValue }) => {      console.log('API Response: Profile fetch response:', response);const profileSlice = createSlice({
+
+    try {
+
+      console.log('API Request: Changing password');      
+
+      await profileService.changePassword(passwordData);
+
+      console.log('API Response: Password changed successfully');      if (!response.success) {  name: 'profile',
+
+      return true;
+
+    } catch (error: any) {        throw new Error(response.message);
+
+      console.log('API Error: Change password error:', error.message);
+
+      return rejectWithValue(error.message);      }  initialState,const initialState: ProfileState = {  loading: boolean;
+
+    }
+
+  }      return response.data!;
+
+);
+
+    } catch (error: any) {  reducers: {
+
+// Upload profile image
+
+export const uploadProfileImage = createAsyncThunk(      console.log('API Error: Profile fetch error:', error.message);
+
+  'profile/uploadProfileImage',
+
+  async (imageFile: any, { rejectWithValue }) => {      return rejectWithValue(error.message);    setProfile: (state, action: PayloadAction<any>) => {  user: null,
+
+    try {
+
+      console.log('API Request: Uploading profile image');    }
+
+      const response = await profileService.uploadProfileImage(imageFile);
+
+      console.log('API Response: Upload image response:', response);  }      state.user = action.payload;
+
+      return response;
+
+    } catch (error: any) {);
+
+      console.log('API Error: Upload image error:', error.message);
+
+      return rejectWithValue(error.message);    },  loading: false,  error: string | null;
+
+    }
+
+  }// Update profile
+
+);
+
+export const updateProfile = createAsyncThunk(    setLoading: (state, action: PayloadAction<boolean>) => {
+
+const profileSlice = createSlice({
+
+  name: 'profile',  'profile/updateProfile',
+
+  initialState,
+
+  reducers: {  async (profileData: UpdateProfileRequest, { rejectWithValue }) => {      state.loading = action.payload;  error: null,
+
+    clearError: (state) => {
+
+      state.error = null;    try {
+
+    },
+
+    clearUpdateSuccess: (state) => {      console.log('API Request: Updating profile with data:', profileData);    },
+
+      state.updateSuccess = false;
+
+    },      const response = await profileService.updateProfile(profileData);
+
+    setLoading: (state, action: PayloadAction<boolean>) => {
+
+      state.loading = action.payload;      console.log('API Response: Profile update response:', response);    setError: (state, action: PayloadAction<string | null>) => {};}export interface ProfileState {export interface ProfileState {
+
+    },
+
+    setUpdating: (state, action: PayloadAction<boolean>) => {      
+
+      state.updating = action.payload;
+
+    },      if (!response.success) {      state.error = action.payload;
+
+  },
+
+  extraReducers: (builder) => {        throw new Error(response.message);
+
+    builder
+
+      // Fetch profile      }    },
+
+      .addCase(fetchProfile.pending, (state) => {
+
+        state.loading = true;      return response.data!;
+
+        state.error = null;
+
+      })    } catch (error: any) {    clearProfile: (state) => {
+
+      .addCase(fetchProfile.fulfilled, (state, action) => {
+
+        state.loading = false;      console.log('API Error: Profile update error:', error.message);
+
+        state.profile = action.payload;
+
+        state.error = null;      return rejectWithValue(error.message);      state.user = null;const profileSlice = createSlice({
+
+      })
+
+      .addCase(fetchProfile.rejected, (state, action) => {    }
+
+        state.loading = false;
+
+        state.error = action.payload as string;  }      state.error = null;
+
+      })
+
+);
+
+      // Update profile
+
+      .addCase(updateProfile.pending, (state) => {    },  name: 'profile',
+
+        state.updating = true;
+
+        state.error = null;// Change password
+
+        state.updateSuccess = false;
+
+      })export const changePassword = createAsyncThunk(  },
+
+      .addCase(updateProfile.fulfilled, (state, action) => {
+
+        state.updating = false;  'profile/changePassword',
+
+        state.profile = action.payload;
+
+        state.error = null;  async (passwordData: ChangePasswordRequest, { rejectWithValue }) => {});  initialState,const initialState: ProfileState = {  profile: DriverProfile | null;  profile: DriverProfile | null;
+
+        state.updateSuccess = true;
+
+      })    try {
+
+      .addCase(updateProfile.rejected, (state, action) => {
+
+        state.updating = false;      console.log('API Request: Changing password');
+
+        state.error = action.payload as string;
+
+        state.updateSuccess = false;      const response = await profileService.changePassword(passwordData);
+
+      })
+
+      console.log('API Response: Change password response:', response);export const { setProfile, setLoading, setError, clearProfile } = profileSlice.actions;  reducers: {
+
+      // Change password
+
+      .addCase(changePassword.pending, (state) => {      
+
+        state.updating = true;
+
+        state.error = null;      if (!response.success) {export default profileSlice.reducer;
+
+      })
+
+      .addCase(changePassword.fulfilled, (state) => {        throw new Error(response.message);    setProfile: (state, action: PayloadAction<any>) => {  profile: null,
+
+        state.updating = false;
+
+        state.updateSuccess = true;      }
+
+        state.error = null;
+
+      })      return response.data!;      state.user = action.payload;
+
+      .addCase(changePassword.rejected, (state, action) => {
+
+        state.updating = false;    } catch (error: any) {
+
+        state.error = action.payload as string;
+
+      })      console.log('API Error: Change password error:', error.message);    },  loading: false,  loading: boolean;  loading: boolean;
+
+
+
+      // Upload profile image      return rejectWithValue(error.message);
+
+      .addCase(uploadProfileImage.pending, (state) => {
+
+        state.uploading = true;    }    setLoading: (state, action: PayloadAction<boolean>) => {
+
+        state.error = null;
+
+      })  }
+
+      .addCase(uploadProfileImage.fulfilled, (state, action) => {
+
+        state.uploading = false;);      state.loading = action.payload;  error: null,
+
+        state.profile = action.payload;
+
+        state.error = null;
+
+      })
+
+      .addCase(uploadProfileImage.rejected, (state, action) => {// Upload profile image    },
+
+        state.uploading = false;
+
+        state.error = action.payload as string;export const uploadProfileImage = createAsyncThunk(
+
+      });
+
+  },  'profile/uploadProfileImage',    setError: (state, action: PayloadAction<string | null>) => {};  updating: boolean;  updating: boolean;
+
+});
+
+  async (imageUri: string, { rejectWithValue }) => {
+
+export const { clearError, clearUpdateSuccess, setLoading, setUpdating } = profileSlice.actions;
+
+    try {      state.error = action.payload;
+
+// Selectors
+
+export const selectProfile = (state: { profile: ProfileState }) => state.profile.profile;      console.log('API Request: Uploading profile image');
+
+export const selectProfileLoading = (state: { profile: ProfileState }) => state.profile.loading;
+
+export const selectProfileUpdating = (state: { profile: ProfileState }) => state.profile.updating;      const response = await profileService.uploadProfileImage(imageUri);    },
+
+export const selectProfileUploading = (state: { profile: ProfileState }) => state.profile.uploading;
+
+export const selectProfileError = (state: { profile: ProfileState }) => state.profile.error;      console.log('API Response: Upload image response:', response);
+
+export const selectProfileUpdateSuccess = (state: { profile: ProfileState }) => state.profile.updateSuccess;
+
+          clearProfile: (state) => {
+
+export default profileSlice.reducer;
+      if (!response.success) {
+
+        throw new Error(response.message);      state.user = null;const profileSlice = createSlice({  uploading: boolean;  uploading: boolean;
+
+      }
+
+      return response.data!;      state.error = null;
+
+    } catch (error: any) {
+
+      console.log('API Error: Upload image error:', error.message);    },  name: 'profile',
+
+      return rejectWithValue(error.message);
+
+    }  },
+
+  }
+
+);});  initialState,  error: string | null;  error: string | null;
 
 
 
@@ -30,170 +383,191 @@ const profileSlice = createSlice({
 
   name: 'profile',
 
-  initialState,const initialState: ProfileState = {  loading: boolean;
+  initialState,export const { setProfile, setLoading, setError, clearProfile } = profileSlice.actions;  reducers: {
 
   reducers: {
 
-    setProfile: (state, action: PayloadAction<any>) => {  user: null,
+    clearError: (state) => {export default profileSlice.reducer;
 
-      state.user = action.payload;
+      state.error = null;    setProfile: (state, action: PayloadAction<any>) => {  updateSuccess: boolean;  updateSuccess: boolean;
 
-    },  loading: false,  error: string | null;
+    },
+
+    clearUpdateSuccess: (state) => {      state.profile = action.payload;
+
+      state.updateSuccess = false;
+
+    },    },}}
 
     setLoading: (state, action: PayloadAction<boolean>) => {
 
-      state.loading = action.payload;  error: null,
+      state.loading = action.payload;    setLoading: (state, action: PayloadAction<boolean>) => {
 
     },
 
-    setError: (state, action: PayloadAction<string | null>) => {};}export interface ProfileState {export interface ProfileState {
+    setUpdating: (state, action: PayloadAction<boolean>) => {      state.loading = action.payload;
 
-      state.error = action.payload;
+      state.updating = action.payload;
 
-    },
-
-    clearProfile: (state) => {
-
-      state.user = null;const profileSlice = createSlice({
-
-      state.error = null;
-
-    },  name: 'profile',
+    },    },
 
   },
 
-});  initialState,const initialState: ProfileState = {  profile: DriverProfile | null;  profile: DriverProfile | null;
+  extraReducers: (builder) => {    setError: (state, action: PayloadAction<string | null>) => {const initialState: ProfileState = {const initialState: ProfileState = {
 
+    builder
 
+      // Fetch profile      state.error = action.payload;
 
-export const { setProfile, setLoading, setError, clearProfile } = profileSlice.actions;  reducers: {
+      .addCase(fetchProfile.pending, (state) => {
 
-export default profileSlice.reducer;
-    setProfile: (state, action: PayloadAction<any>) => {  profile: null,
+        state.loading = true;    },  profile: null,  profile: null,
 
-      state.user = action.payload;
+        state.error = null;
 
-    },  loading: false,  loading: boolean;  loading: boolean;
+      })    clearProfile: (state) => {
 
-    setLoading: (state, action: PayloadAction<boolean>) => {
+      .addCase(fetchProfile.fulfilled, (state, action) => {
 
-      state.loading = action.payload;  error: null,
+        state.loading = false;      state.profile = null;  loading: false,  loading: false,
 
-    },
+        state.profile = action.payload;
 
-    setError: (state, action: PayloadAction<string | null>) => {};  updating: boolean;  updating: boolean;
+        state.error = null;      state.error = null;
 
-      state.error = action.payload;
+      })
 
-    },
+      .addCase(fetchProfile.rejected, (state, action) => {    },  updating: false,  updating: false,
 
-    clearProfile: (state) => {
+        state.loading = false;
 
-      state.user = null;const profileSlice = createSlice({  uploading: boolean;  uploading: boolean;
+        state.error = action.payload as string;  },
 
-      state.error = null;
-
-    },  name: 'profile',
-
-  },
-
-});  initialState,  error: string | null;  error: string | null;
-
-
-
-export const { setProfile, setLoading, setError, clearProfile } = profileSlice.actions;  reducers: {
-
-export default profileSlice.reducer;
-    setProfile: (state, action: PayloadAction<any>) => {  updateSuccess: boolean;  updateSuccess: boolean;
-
-      state.profile = action.payload;
-
-    },}}
-
-    setLoading: (state, action: PayloadAction<boolean>) => {
-
-      state.loading = action.payload;
-
-    },
-
-    setError: (state, action: PayloadAction<string | null>) => {const initialState: ProfileState = {const initialState: ProfileState = {
-
-      state.error = action.payload;
-
-    },  profile: null,  profile: null,
-
-    clearProfile: (state) => {
-
-      state.profile = null;  loading: false,  loading: false,
-
-      state.error = null;
-
-    },  updating: false,  updating: false,
-
-  },
+      })
 
 });  uploading: false,  uploading: false,
 
+      // Update profile
 
+      .addCase(updateProfile.pending, (state) => {
 
-export const { setProfile, setLoading, setError, clearProfile } = profileSlice.actions;  error: null,  error: null,
+        state.updating = true;
 
+        state.error = null;export const { setProfile, setLoading, setError, clearProfile } = profileSlice.actions;  error: null,  error: null,
 
+        state.updateSuccess = false;
 
-export default profileSlice.reducer;  updateSuccess: false,  updateSuccess: false,
+      })
 
-};};
+      .addCase(updateProfile.fulfilled, (state, action) => {
 
+        state.updating = false;export default profileSlice.reducer;  updateSuccess: false,  updateSuccess: false,
 
+        state.profile = action.payload;
 
-// Async thunks// Async thunks
+        state.error = null;};};
 
-export const fetchProfile = createAsyncThunk(export const fetchProfile = createAsyncThunk(
+        state.updateSuccess = true;
+
+      })
+
+      .addCase(updateProfile.rejected, (state, action) => {
+
+        state.updating = false;// Async thunks// Async thunks
+
+        state.error = action.payload as string;
+
+        state.updateSuccess = false;export const fetchProfile = createAsyncThunk(export const fetchProfile = createAsyncThunk(
+
+      })
 
   'profile/fetchProfile',  'profile/fetchProfile',
 
-  async (_, { rejectWithValue }) => {  async (_, { rejectWithValue }) => {
+      // Change password
 
-    try {    try {
+      .addCase(changePassword.pending, (state) => {  async (_, { rejectWithValue }) => {  async (_, { rejectWithValue }) => {
 
-      const response = await profileService.getProfile();      const response = await profileService.getProfile();
+        state.updating = true;
+
+        state.error = null;    try {    try {
+
+      })
+
+      .addCase(changePassword.fulfilled, (state) => {      const response = await profileService.getProfile();      const response = await profileService.getProfile();
+
+        state.updating = false;
+
+        state.updateSuccess = true;      return response.data.driver;      return response.data.driver;
+
+        state.error = null;
+
+      })    } catch (error: any) {    } catch (error: any) {
+
+      .addCase(changePassword.rejected, (state, action) => {
+
+        state.updating = false;      return rejectWithValue(error.message || 'Failed to fetch profile');      return rejectWithValue(error.message || 'Failed to fetch profile');
+
+        state.error = action.payload as string;
+
+      })    }    }
+
+
+
+      // Upload profile image  }  }
+
+      .addCase(uploadProfileImage.pending, (state) => {
+
+        state.uploading = true;););
+
+        state.error = null;
+
+      })
+
+      .addCase(uploadProfileImage.fulfilled, (state, action) => {
+
+        state.uploading = false;export const updateProfile = createAsyncThunk(export const updateProfile = createAsyncThunk(
+
+        state.profile = action.payload;
+
+        state.error = null;  'profile/updateProfile',  'profile/updateProfile',
+
+      })
+
+      .addCase(uploadProfileImage.rejected, (state, action) => {  async (profileData: UpdateProfileRequest, { rejectWithValue }) => {  async (profileData: UpdateProfileRequest, { rejectWithValue }) => {
+
+        state.uploading = false;
+
+        state.error = action.payload as string;    try {    try {
+
+      });
+
+  },      const response = await profileService.updateProfile(profileData);      const response = await profileService.updateProfile(profileData);
+
+});
 
       return response.data.driver;      return response.data.driver;
 
-    } catch (error: any) {    } catch (error: any) {
-
-      return rejectWithValue(error.message || 'Failed to fetch profile');      return rejectWithValue(error.message || 'Failed to fetch profile');
-
-    }    }
-
-  }  }
-
-););
-
-
-
-export const updateProfile = createAsyncThunk(export const updateProfile = createAsyncThunk(
-
-  'profile/updateProfile',  'profile/updateProfile',
-
-  async (profileData: UpdateProfileRequest, { rejectWithValue }) => {  async (profileData: UpdateProfileRequest, { rejectWithValue }) => {
-
-    try {    try {
-
-      const response = await profileService.updateProfile(profileData);      const response = await profileService.updateProfile(profileData);
-
-      return response.data.driver;      return response.data.driver;
+export const { clearError, clearUpdateSuccess, setLoading, setUpdating } = profileSlice.actions;
 
     } catch (error: any) {    } catch (error: any) {
 
-      return rejectWithValue(error.message || 'Failed to update profile');      return rejectWithValue(error.message || 'Failed to update profile');
+// Selectors
 
-    }    }
+export const selectProfile = (state: { profile: ProfileState }) => state.profile.profile;      return rejectWithValue(error.message || 'Failed to update profile');      return rejectWithValue(error.message || 'Failed to update profile');
 
-  }  }
+export const selectProfileLoading = (state: { profile: ProfileState }) => state.profile.loading;
+
+export const selectProfileUpdating = (state: { profile: ProfileState }) => state.profile.updating;    }    }
+
+export const selectProfileUploading = (state: { profile: ProfileState }) => state.profile.uploading;
+
+export const selectProfileError = (state: { profile: ProfileState }) => state.profile.error;  }  }
+
+export const selectProfileUpdateSuccess = (state: { profile: ProfileState }) => state.profile.updateSuccess;
 
 ););
 
+export default profileSlice.reducer;
 
 
 export const changePassword = createAsyncThunk(export const changePassword = createAsyncThunk(

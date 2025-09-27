@@ -181,6 +181,7 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
                 style={styles.fieldInput}
                 value={`${formData.first_name || ''} ${formData.last_name || ''}`.trim()}
                 onChangeText={(text: string) => {
+                  // Allow all characters including spaces
                   const names = text.split(' ');
                   setFormData(prev => ({ 
                     ...prev, 
@@ -189,6 +190,11 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
                   }));
                 }}
                 placeholder="Enter full name"
+                autoCapitalize="words"
+                keyboardType="default"
+                autoCorrect={false}
+                multiline={false}
+                textContentType="name"
               />
             ) : (
               <Text style={styles.fieldValue}>

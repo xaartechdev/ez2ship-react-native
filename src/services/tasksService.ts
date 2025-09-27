@@ -6,7 +6,17 @@ export interface Task {
   customer_name: string;
   customer_phone: string;
   type: string;
-  status: 'pending' | 'assigned' | 'in_progress' | 'picked_up' | 'in_transit' | 'delivered' | 'cancelled' | '';
+  status: 
+    | 'pending' 
+    | 'assigned' 
+    | 'in_progress' 
+    | 'picked_up' 
+    | 'in_transit' 
+    | 'arrived_at_destination'
+    | 'completed'
+    | 'delivered' 
+    | 'cancelled' 
+    | '';
   pickup_address: string;
   delivery_address: string;
   scheduled_pickup: string;
@@ -54,7 +64,16 @@ export interface TasksResponse {
 }
 
 export interface TaskStatusUpdate {
-  status: string;
+  status: 
+    | 'pending' 
+    | 'assigned' 
+    | 'in_progress' 
+    | 'picked_up' 
+    | 'in_transit' 
+    | 'arrived_at_destination'
+    | 'completed'
+    | 'delivered' 
+    | 'cancelled';
   notes?: string;
   location?: {
     latitude: number;
@@ -69,9 +88,7 @@ class TasksService {
     per_page?: number;
   }): Promise<TasksResponse> {
     try {
-      console.log('TasksService: Calling getTasks with params:', params);
       const response = await apiClient.getTasks(params);
-      console.log('TasksService: API response:', JSON.stringify(response, null, 2));
       
       // Transform the response to include customer object
       if (response.success && response.data && (response.data as any).tasks) {
@@ -86,8 +103,6 @@ class TasksService {
           }
         }));
         
-        console.log('TasksService: Transformed tasks:', transformedTasks.length);
-        
         return {
           ...response,
           data: {
@@ -97,7 +112,6 @@ class TasksService {
         } as TasksResponse;
       }
       
-      console.log('TasksService: No tasks in response or response not successful');
       return response as TasksResponse;
     } catch (error: any) {
       return {

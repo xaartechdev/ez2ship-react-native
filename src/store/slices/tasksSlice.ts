@@ -104,7 +104,7 @@ export const updateTaskStatus = createAsyncThunk(
   'tasks/updateTaskStatus',
   async ({ taskId, status, notes, location }: {
     taskId: number;
-    status: string;
+    status: 'pending' | 'assigned' | 'in_progress' | 'picked_up' | 'in_transit' | 'arrived_at_destination' | 'completed' | 'delivered' | 'cancelled';
     notes?: string;
     location?: { latitude: number; longitude: number };
   }, { rejectWithValue, dispatch }) => {
@@ -183,12 +183,10 @@ const tasksSlice = createSlice({
             has_more: action.payload.data.pagination.current_page < action.payload.data.pagination.last_page
           };
           
-          // Calculate summary from tasks
-          state.summary = {
-            pending: action.payload.data.tasks.filter(t => t.status === 'pending').length,
-            in_progress: action.payload.data.tasks.filter(t => t.status === 'in_progress').length,
-            completed: action.payload.data.tasks.filter(t => t.status === 'delivered').length,
-          };
+          // Use summary from API response instead of calculating locally
+          if (action.payload.data.summary) {
+            state.summary = action.payload.data.summary;
+          }
         }
         state.error = null;
       })

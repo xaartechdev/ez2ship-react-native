@@ -49,6 +49,12 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
   const [task, setTask] = useState<Task>(initialTask);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // OTP and Proof of Delivery states
+  const [otpCode, setOtpCode] = useState('');
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [proofUploaded, setProofUploaded] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -177,13 +183,28 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
           break;
         case 'arrived':
         case 'arrived_at_destination':
-          // Mark as completed - update status to completed and navigate to proof of delivery
+          // Complete delivery - check if OTP is verified
+          if (!otpVerified) {
+            Alert.alert('Verification Required', 'Please verify customer OTP before completing delivery.');
+            return;
+          }
+          
           await orderService.updateOrderStatus(task.id, {
             status: 'completed',
             notes: notes
           });
           setTask({...task, status: 'completed'});
-          navigation.navigate('ProofOfDelivery', {task: {...task, status: 'completed'}});
+          
+          Alert.alert(
+            'Delivery Completed',
+            'The delivery has been marked as completed successfully!',
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.navigate('MyTasks'),
+              },
+            ]
+          );
           return;
         default:
           return;
@@ -218,6 +239,52 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
       {text: 'Damage', onPress: () => console.log('Report damage')},
       {text: 'Other', onPress: () => console.log('Report other issue')},
     ]);
+  };
+
+  // OTP and Proof of Delivery functions
+  const handleSendOTP = () => {
+    Alert.alert('OTP Sent', 'A 6-digit verification code has been sent to the customer.');
+  };
+
+  const handleVerifyOTP = async () => {
+    if (otpCode.length !== 6) {
+      Alert.alert('Invalid OTP', 'Please enter a 6-digit verification code.');
+      return;
+    }
+
+    try {
+      setOtpLoading(true);
+      // Simulate OTP verification - replace with actual API call
+      await new Promise<void>(resolve => setTimeout(resolve, 1000));
+      
+      // For demo purposes, accept any 6-digit code
+      setOtpVerified(true);
+      Alert.alert('Success', 'Customer identity verified successfully!');
+    } catch (error: any) {
+      Alert.alert('Error', 'OTP verification failed');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleUploadProof = () => {
+    Alert.alert(
+      'Upload Proof of Delivery',
+      'Choose how to upload proof:',
+      [
+        { text: 'Camera', onPress: () => {
+          console.log('Open camera');
+          setProofUploaded(true);
+          Alert.alert('Success', 'Proof of delivery uploaded successfully!');
+        }},
+        { text: 'Gallery', onPress: () => {
+          console.log('Open gallery');
+          setProofUploaded(true);
+          Alert.alert('Success', 'Proof of delivery uploaded successfully!');
+        }},
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
   };
 
   return (
@@ -414,6 +481,111 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
           )}
           </View>
         </View>
+
+        {/* OTP Verification Section - Show after arrived at destination */}
+        {(task.status === 'arrived' || task.status === 'arrived_at_destination') && (
+          <View style={styles.deliverySection}>
+            <View style={styles.deliverySectionHeader}>
+              <Text style={styles.deliverySectionIcon}>#</Text>
+              <Text style={styles.deliverySectionTitle}>Customer OTP Verification</Text>
+            </View>
+            
+            <View style={styles.otpInstructionContainer}>
+              <Text style={styles.otpInstructionText}>
+                Ask the customer for their 6-digit delivery confirmation code.
+              </Text>
+            </View>
+
+            <View style={styles.otpInputContainer}>
+              <TextInput
+                style={styles.otpInput}
+                placeholder="Enter 6-digit OTP"
+                value={otpCode}
+                onChangeText={setOtpCode}
+                keyboardType="numeric"
+                maxLength={6}
+                editable={!otpVerified}
+              />
+              {/* <TouchableOpacity
+                style={styles.sendOtpButton}
+                onPress={handleSendOTP}
+              >
+                <Text style={styles.sendOtpButtonText}>Send OTP</Text>
+              </TouchableOpacity> */}
+            </View>
+
+            {/* <TouchableOpacity
+              style={[
+                styles.verifyOtpButton,
+                otpVerified && styles.verifyOtpButtonVerified
+              ]}
+              onPress={handleVerifyOTP}
+              disabled={otpVerified || otpLoading || otpCode.length !== 6}
+            >
+              {otpLoading ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <Text style={styles.verifyOtpButtonText}>
+                  {otpVerified ? '✓ OTP Verified' : 'Verify OTP'}
+                </Text>
+              )}
+            </TouchableOpacity> */}
+          </View>
+        )}
+
+        {/* Proof of Delivery Section - Show after arrived at destination */}
+        {(task.status === 'arrived' || task.status === 'arrived_at_destination') && (
+          <View style={styles.deliverySection}>
+            <View style={styles.deliverySectionHeader}>
+              <Text style={styles.deliverySectionIcon}>📎</Text>
+              <Text style={styles.deliverySectionTitle}>Proof of Delivery Documents</Text>
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.uploadButton,
+                proofUploaded && styles.uploadButtonUploaded
+              ]}
+              onPress={handleUploadProof}
+            >
+              <Text style={styles.uploadButtonIcon}>
+                {proofUploaded ? '✓' : '📤'}
+              </Text>
+              <Text style={styles.uploadButtonText}>
+                {proofUploaded ? 'Document Uploaded' : 'Upload Document'}
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={styles.uploadHelpText}>
+              Upload delivery receipts, photos, or other proof of delivery documents
+            </Text>
+
+            {!otpVerified && (
+              <TouchableOpacity
+                style={styles.completeDeliveryButtonDisabled}
+                disabled={true}
+              >
+                <Text style={styles.completeDeliveryButtonDisabledText}>
+                  Complete Delivery
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* Delivery Notes Section */}
+        {(task.status === 'arrived' || task.status === 'arrived_at_destination') && (
+          <View style={styles.deliverySection}>
+            <Text style={styles.deliverySectionTitle}>Delivery Notes</Text>
+            <TextInput
+              style={styles.deliveryNotesInput}
+              multiline
+              placeholder="Add any notes about the delivery..."
+              value={notes}
+              onChangeText={setNotes}
+            />
+          </View>
+        )}
 
         {/* Notes */}
         <View style={styles.notesContainer}>
@@ -794,6 +966,140 @@ const styles = StyleSheet.create({
   },
   progressIndicatorCurrent: {
     backgroundColor: '#007AFF',
+  },
+  // Delivery section styles
+  deliverySection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  deliverySectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  deliverySectionIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  deliverySectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  otpInstructionContainer: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  otpInstructionText: {
+    fontSize: 14,
+    color: '#1565C0',
+    textAlign: 'center',
+  },
+  otpInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  otpInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    marginRight: 12,
+    textAlign: 'center',
+    letterSpacing: 2,
+  },
+  sendOtpButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  sendOtpButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  verifyOtpButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    opacity: 1,
+  },
+  verifyOtpButtonVerified: {
+    backgroundColor: '#4CAF50',
+  },
+  verifyOtpButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  uploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8f9fa',
+    borderWidth: 2,
+    borderColor: '#ddd',
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    paddingVertical: 20,
+    marginBottom: 12,
+  },
+  uploadButtonUploaded: {
+    backgroundColor: '#E8F5E8',
+    borderColor: '#4CAF50',
+    borderStyle: 'solid',
+  },
+  uploadButtonIcon: {
+    fontSize: 24,
+    marginRight: 8,
+  },
+  uploadButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  uploadHelpText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  completeDeliveryButtonDisabled: {
+    backgroundColor: '#f0f0f0',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    opacity: 0.6,
+  },
+  completeDeliveryButtonDisabledText: {
+    color: '#999',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  deliveryNotesInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 14,
+    minHeight: 80,
+    textAlignVertical: 'top',
   },
 });
 

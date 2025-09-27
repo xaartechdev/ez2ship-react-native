@@ -69,11 +69,8 @@ class ApiClient {
     }
 
     try {
-      console.log(`API Request: ${method} ${url}`, {
-        headers: requestHeaders,
-        body: body && !(body instanceof FormData) ? body : '[FormData]'
-      });
-
+      const requestStart = Date.now();
+      
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
@@ -83,6 +80,7 @@ class ApiClient {
       });
 
       clearTimeout(timeoutId);
+      const requestDuration = Date.now() - requestStart;
 
       let responseData;
       const contentType = response.headers.get('content-type');
@@ -93,7 +91,12 @@ class ApiClient {
         responseData = await response.text();
       }
 
-      console.log(`API Response: ${response.status}`, responseData);
+      // Simple logging: Request params and response
+      console.log(`🌐 ${method} ${endpoint}`, {
+        params: body && !(body instanceof FormData) ? body : undefined,
+        response: responseData,
+        duration: `${requestDuration}ms`
+      });
 
       // Handle different response formats
       if (response.ok) {
@@ -200,11 +203,10 @@ class ApiClient {
   }) {
     const queryParams = new URLSearchParams();
     if (params?.status) {
-      // Map UI status values to API status values
       const statusMapping = {
         'all': 'all',
         'pending': 'pending',
-        'in_progress': 'in_transit',
+        'in_progress': 'in_progress',
         'completed': 'completed'
       };
       const apiStatus = statusMapping[params.status] || params.status;
@@ -215,7 +217,7 @@ class ApiClient {
     
     const queryString = queryParams.toString();
     const endpoint = queryString ? `/driver/tasks?${queryString}` : '/driver/tasks';
-    console.log('urlendpoint', endpoint);
+    
     return this.makeRequest(endpoint);
   }
 
@@ -309,8 +311,9 @@ class ApiClient {
     });
   }
 
-  async getStatistics(period: 'week' | 'month' | 'year' = 'month') {
-    return this.makeRequest(`/driver/profile/statistics?period=${period}`);
+  async getStatistics(period?: 'week' | 'month' | 'year') {
+    const endpoint = period ? `/driver/profile/statistics?period=${period}` : '/driver/profile/statistics';
+    return this.makeRequest(endpoint);
   }
 
   async updatePreferences(preferences: {

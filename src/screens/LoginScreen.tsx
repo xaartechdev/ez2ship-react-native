@@ -15,6 +15,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { login, clearError } from '../store/slices/authSlice';
 import { Button, Input, Loading } from '../components/common';
 import { ENV } from '../config/environment';
+import { Logo } from '../assets/images/Logo';
 
 interface LoginScreenProps {
   navigation: any;
@@ -117,11 +118,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* App Icon */}
-          <View style={styles.iconContainer}>
-            <View style={styles.appIcon}>
-              <Text style={styles.iconText}>📱</Text>
-            </View>
+          {/* App Logo */}
+          <View style={styles.logoContainer}>
+            <Logo width={140} height={110} />
           </View>
 
           {/* App Title */}
@@ -206,28 +205,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: ENV.DIMENSIONS.PADDING * 2,
   },
-  iconContainer: {
+  logoContainer: {
     alignItems: 'center',
     marginBottom: ENV.DIMENSIONS.MARGIN * 2,
-  },
-  appIcon: {
-    width: 80,
-    height: 80,
-    backgroundColor: ENV.COLORS.PRIMARY,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: ENV.COLORS.BLACK,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  iconText: {
-    fontSize: 40,
+    marginTop: ENV.DIMENSIONS.MARGIN,
   },
   title: {
     fontSize: ENV.FONT_SIZES.TITLE,
