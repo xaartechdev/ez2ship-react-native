@@ -14,6 +14,7 @@ import {
 import { useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { profileService, DriverProfile, UpdateProfileRequest } from '../services/profileService';
+import BackHeader from '../components/BackHeader';
 import { authService } from '../services/authService';
 import { logout } from '../store/slices/authSlice';
 
@@ -110,24 +111,7 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => {
-              console.log('Back button pressed - Profile Loading');
-              if (navigationHook.canGoBack()) {
-                navigationHook.goBack();
-              } else {
-                navigationHook.navigate('Settings' as never);
-              }
-            }}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <BackHeader title="Profile" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>Loading profile...</Text>
@@ -140,24 +124,7 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => {
-              console.log('Back button pressed - Profile Error');
-              if (navigationHook.canGoBack()) {
-                navigationHook.goBack();
-              } else {
-                navigationHook.navigate('Settings' as never);
-              }
-            }}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <BackHeader title="Profile" />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Failed to load profile</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchProfile}>
@@ -171,27 +138,10 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => {
-            console.log('Back button pressed - Profile');
-            if (navigationHook.canGoBack()) {
-              navigationHook.goBack();
-            } else {
-              navigationHook.navigate('Settings' as never);
-            }
-          }}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <View style={styles.placeholder} />
-      </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <BackHeader title="Profile" />
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
             <Text style={styles.avatarText}>
@@ -340,50 +290,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f4',
-    backgroundColor: '#ffffff',
-    minHeight: 80,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 22,
-    backgroundColor: '#e3f2fd',
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  backButtonText: {
-    fontSize: 22,
-    color: '#007AFF',
-    fontWeight: '900',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    flex: 1,
-  },
-  placeholder: {
-    width: 44,
-  },
   content: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingTop: 16,
+    paddingBottom: 120,
   },
   loadingContainer: {
     flex: 1,
@@ -424,6 +336,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     padding: 20,
     marginBottom: 12,
+    marginTop: 0,
   },
   avatarContainer: {
     width: 64,
@@ -465,10 +378,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,

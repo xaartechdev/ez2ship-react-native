@@ -10,6 +10,7 @@ import { RootState } from '../store';
 import LoginScreen from '../screens/LoginScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
+import FirstTimePasswordScreen from '../screens/FirstTimePasswordScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import MyTasksScreen from '../screens/MyTasksScreen';
 import AlertsScreen from '../screens/AlertsScreen';
@@ -172,6 +173,15 @@ const AppStackNavigator = () => {
 // Root Navigation
 const RootNavigator = () => {
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const user = useSelector((state: RootState) => state.auth.user);
+
+  console.log('=== RootNavigator Debug ===');
+  console.log('isAuthenticated:', isAuthenticated);
+  console.log('user object:', user);
+  console.log('user?.is_first_login:', user?.is_first_login);
+  console.log('typeof user?.is_first_login:', typeof user?.is_first_login);
+  console.log('user?.is_first_login === 1:', user?.is_first_login === 1);
+  console.log('========================');
 
   return (
     <NavigationContainer>
@@ -180,10 +190,18 @@ const RootNavigator = () => {
           headerShown: false,
         }}
       >
-        {isAuthenticated ? (
-          <Stack.Screen name="Main" component={AppStackNavigator} />
-        ) : (
+        {!isAuthenticated ? (
           <Stack.Screen name="Auth" component={AuthStackNavigator} />
+        ) : user?.is_first_login === 1 ? (
+          <Stack.Screen 
+            name="FirstTimePassword" 
+            component={FirstTimePasswordScreen}
+            options={{
+              gestureEnabled: false,
+            }}
+          />
+        ) : (
+          <Stack.Screen name="Main" component={AppStackNavigator} />
         )}
       </Stack.Navigator>
     </NavigationContainer>

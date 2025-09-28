@@ -10,6 +10,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import BackHeader, { HEADER_MIN_HEIGHT } from '../components/BackHeader';
+import { authService } from '../services/authService';
 
 interface ChangePasswordScreenProps {
   navigation: any;
@@ -33,52 +35,33 @@ const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ navigation 
       return;
     }
 
-    if (newPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters long');
+    if (newPassword.length < 8) {
+      Alert.alert('Error', 'Password must be at least 8 characters long');
       return;
     }
 
     setLoading(true);
     try {
-      // TODO: Implement actual password change API call
-      // await authService.changePassword(currentPassword, newPassword);
+      const result = await authService.changePassword(currentPassword, newPassword, confirmPassword);
       
-      // Mock success for now
-      setTimeout(() => {
-        setLoading(false);
-        Alert.alert('Success', 'Password changed successfully', [
+      if (result.success) {
+        Alert.alert('Success', result.message || 'Password changed successfully', [
           { text: 'OK', onPress: () => navigationHook.goBack() }
         ]);
-      }, 1000);
-    } catch (error) {
+      } else {
+        Alert.alert('Error', result.message || 'Failed to change password. Please try again.');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to change password. Please try again.');
+    } finally {
       setLoading(false);
-      Alert.alert('Error', 'Failed to change password. Please try again.');
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => {
-              console.log('Back button pressed - ChangePassword');
-              if (navigationHook.canGoBack()) {
-                navigationHook.goBack();
-              } else {
-                navigationHook.navigate('Settings' as never);
-              }
-            }}
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Change Password</Text>
-          <View style={styles.placeholder} />
-        </View>
-
-        {/* Form */}
+      <BackHeader title="Change Password" />
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.form}>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Current Password</Text>
@@ -139,47 +122,9 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    paddingTop: 50,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f4',
-    backgroundColor: '#ffffff',
-    minHeight: 80,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 22,
-    backgroundColor: '#e3f2fd',
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  backButtonText: {
-    fontSize: 22,
-    color: '#007AFF',
-    fontWeight: '900',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    flex: 1,
-  },
-  placeholder: {
-    width: 40,
+  scrollContent: {
+    paddingTop: 16,
+    paddingBottom: 40,
   },
   form: {
     padding: 20,

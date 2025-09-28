@@ -23,7 +23,7 @@ interface LoginScreenProps {
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const dispatch = useAppDispatch();
-  const { isLoading, error, isAuthenticated } = useAppSelector(state => state.auth);
+  const { isLoading, error, isAuthenticated, user } = useAppSelector(state => state.auth);
 
   const [email, setEmail] = useState('driver1@test.com');
   const [password, setPassword] = useState('');
@@ -32,10 +32,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const [passwordError, setPasswordError] = useState('');
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigation.replace('Main');
+    console.log('LoginScreen useEffect - isAuthenticated:', isAuthenticated, 'user:', user);
+    if (isAuthenticated && user) {
+      // Navigation will be handled automatically by RootNavigator based on is_first_login
+      // No need to navigate manually here anymore
+      console.log('User logged in successfully, RootNavigator will handle navigation');
     }
-  }, [isAuthenticated, navigation]);
+  }, [isAuthenticated, user, navigation]);
 
   useEffect(() => {
     if (error) {

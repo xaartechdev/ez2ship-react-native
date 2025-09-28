@@ -4,22 +4,16 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   SafeAreaView,
   StatusBar,
   ActivityIndicator,
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
+import BackHeader from '../components/BackHeader';
 import { RootState, AppDispatch } from '../store';
 import { fetchProfile } from '../store/slices/profileSlice';
 
-interface VehicleInformationScreenProps {
-  navigation: any;
-}
-
-const VehicleInformationScreen: React.FC<VehicleInformationScreenProps> = ({ navigation }) => {
-  const navigationHook = useNavigation();
+const VehicleInformationScreen: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { profile, loading } = useSelector((state: RootState) => state.profile);
 
@@ -30,6 +24,8 @@ const VehicleInformationScreen: React.FC<VehicleInformationScreenProps> = ({ nav
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+        <BackHeader title="Vehicle Information" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>Loading vehicle information...</Text>
@@ -41,27 +37,8 @@ const VehicleInformationScreen: React.FC<VehicleInformationScreenProps> = ({ nav
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => {
-            console.log('Back button pressed - VehicleInformation');
-            if (navigationHook.canGoBack()) {
-              navigationHook.goBack();
-            } else {
-              navigationHook.navigate('Settings' as never);
-            }
-          }}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Vehicle Information</Text>
-        <View style={styles.placeholder} />
-      </View>
-
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <BackHeader title="Vehicle Information" />
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Vehicle Icon */}
         <View style={styles.vehicleIconSection}>
           <View style={styles.vehicleIconContainer}>
@@ -212,68 +189,18 @@ const VehicleInformationScreen: React.FC<VehicleInformationScreenProps> = ({ nav
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6c757d',
-    fontWeight: '500',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    paddingTop: 50,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f4',
-    minHeight: 80,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#e3f2fd',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  backButtonText: {
-    fontSize: 22,
-    color: '#007AFF',
-    fontWeight: '900',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    flex: 1,
-  },
-  placeholder: {
-    width: 32,
   },
   scrollView: {
     flex: 1,
   },
+  scrollContent: {
+    paddingTop: 16,
+  },
   vehicleIconSection: {
     backgroundColor: '#ffffff',
     alignItems: 'center',
-    paddingVertical: 32,
+    paddingVertical: 24,
     marginBottom: 12,
   },
   vehicleIconContainer: {
@@ -375,6 +302,18 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 100,
+  },
+  // Loading state styles
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6c757d',
   },
 });
 

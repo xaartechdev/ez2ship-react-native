@@ -28,8 +28,11 @@ export interface User {
   current_status?: string;
   rating?: string;
   total_trips?: number;
-  status: string;
+  status?: string;
   onboarding_progress?: number;
+  is_first_login?: number;
+  on_time_rate?: string;
+  profile_image?: string | null;
 }
 
 export interface AuthResponse {
@@ -55,8 +58,11 @@ class AuthService {
         credentials.device_name || 'React Native App'
       );
 
+      console.log('AuthService login response:', response);
+
       if (response.success && response.data) {
         const loginData = response.data as LoginResponse;
+        console.log('Login data driver:', loginData.driver);
         // Store token and user data
         await this.storeAuthData(loginData.token, loginData.driver);
         
@@ -77,6 +83,7 @@ class AuthService {
         errors: response.errors,
       };
     } catch (error: any) {
+      console.error('AuthService login error:', error);
       return {
         success: false,
         message: error.message || 'Login failed',
@@ -201,8 +208,14 @@ class AuthService {
 
   private async storeAuthData(token: string, user: User | any): Promise<void> {
     try {
+      console.log('AuthService storing user data:', user);
+      console.log('User is_first_login before storage:', user.is_first_login);
       await AsyncStorage.setItem(this.tokenKey, token);
       await AsyncStorage.setItem(this.userKey, JSON.stringify(user));
+      
+      // Verify storage
+      const storedUser = await AsyncStorage.getItem(this.userKey);
+      console.log('AuthService stored user verification:', storedUser);
     } catch (error) {
       console.error('Error storing auth data:', error);
       throw error;
@@ -237,6 +250,38 @@ class AuthService {
       return `${user.first_name} ${user.last_name}`.trim();
     }
     return 'User';
+  }
+
+  // Password change methods
+  async updatePassword(
+    newPassword: string,
+    newPasswordConfirmation: string
+  ): Promise<{ success: boolean; message: string; data?: any }> {
+    try {
+      const response = await apiClient.updatePassword(newPassword, newPasswordConfirmation);
+      return response;
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Failed to update password',
+      };
+    }
+  }
+
+  async changePassword(
+    currentPassword: string,
+    newPassword: string,
+    newPasswordConfirmation: string
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await apiClient.changePassword(currentPassword, newPassword, newPasswordConfirmation);
+      return response;
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Failed to change password',
+      };
+    }
   }
 }
 

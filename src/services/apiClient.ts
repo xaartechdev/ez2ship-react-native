@@ -330,14 +330,31 @@ class ApiClient {
     });
   }
 
-  async changePassword(data: {
-    current_password: string;
-    new_password: string;
-    new_password_confirmation: string;
-  }) {
-    return this.makeRequest('/profile/change-password', {
+  async changePassword(
+    currentPassword: string,
+    newPassword: string,
+    newPasswordConfirmation: string
+  ) {
+    return this.makeRequest('/api/driver/change-password', {
       method: 'POST',
-      body: data,
+      body: {
+        current_password: currentPassword,
+        new_password: newPassword,
+        new_password_confirmation: newPasswordConfirmation,
+      },
+    });
+  }
+
+  async updatePassword(
+    newPassword: string,
+    newPasswordConfirmation: string
+  ) {
+    return this.makeRequest('/api/driver/update-password', {
+      method: 'POST',
+      body: {
+        new_password: newPassword,
+        new_password_confirmation: newPasswordConfirmation,
+      },
     });
   }
 }

@@ -25,10 +25,14 @@ export interface LoginResponse {
     current_status: string;
     rating: string;
     total_trips: number;
-    status: string;
+    status?: string;
+    is_first_login?: number;
+    on_time_rate?: string;
+    profile_image?: string | null;
   };
   token: string;
   token_type: string;
+  expires_at: string;
 }
 
 export interface RegisterResponse {
