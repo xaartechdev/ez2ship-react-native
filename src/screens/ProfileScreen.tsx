@@ -11,48 +11,87 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import { profileService, DriverProfile, UpdateProfileRequest } from '../services/profileService';
 import BackHeader from '../components/BackHeader';
 import { authService } from '../services/authService';
 import { logout } from '../store/slices/authSlice';
+import { updateProfile, fetchProfile } from '../store/slices/profileSlice';
+import { RootState, AppDispatch } from '../store';
 
 interface NavigationProps {
   navigation: any;
 }
 
 const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const navigationHook = useNavigation();
+  const { profile: reduxProfile, loading } = useSelector((state: RootState) => state.profile);
+  const { user } = useSelector((state: RootState) => state.auth);
   const [profile, setProfile] = useState<DriverProfile | null>(null);
-  const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<Partial<DriverProfile>>({});
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    dispatch(fetchProfile());
+  }, [dispatch]);
 
-  const fetchProfile = async () => {
-    try {
-      setLoading(true);
-      const driver = await profileService.getProfile();
-      setProfile(driver);
-      setFormData(driver);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      Alert.alert('Error', 'Failed to load profile data');
-    } finally {
-      setLoading(false);
+  // Update local state when Redux profile changes
+  useEffect(() => {
+    if (reduxProfile) {
+      // Convert ProfileData to DriverProfile format
+      const driverProfile: DriverProfile = {
+        id: user?.id || 0,
+        driver_id: reduxProfile.driver_id || '',
+        first_name: reduxProfile.first_name || '',
+        last_name: reduxProfile.last_name || '',
+        email: reduxProfile.email || '',
+        phone: reduxProfile.phone || '',
+        profile_image: reduxProfile.profile_image || null,
+        current_status: reduxProfile.status || 'active',
+        status: reduxProfile.status || 'active',
+        street_address: reduxProfile.street_address || '',
+        city: reduxProfile.city || '',
+        state: reduxProfile.state || '',
+        zip_code: reduxProfile.zip_code || '',
+        date_of_birth: reduxProfile.date_of_birth || '',
+        license_number: reduxProfile.license_number || '',
+        license_expiry: reduxProfile.license_expiry || '',
+        license_class: reduxProfile.license_class || '',
+        vehicle_number: reduxProfile.vehicle_number || '',
+        emergency_contact_name: reduxProfile.emergency_contact_name || '',
+        emergency_contact_phone: reduxProfile.emergency_contact_phone || '',
+        emergency_contact_relationship: reduxProfile.emergency_contact_relationship || '',
+        full_address: `${reduxProfile.street_address || ''}, ${reduxProfile.city || ''}, ${reduxProfile.state || ''} ${reduxProfile.zip_code || ''}`.trim(),
+        location_string: `${reduxProfile.city || ''}, ${reduxProfile.state || ''}`.trim(),
+        rating: (reduxProfile.rating || 0).toString(),
+        total_trips: reduxProfile.total_trips || 0,
+        on_time_rate: (reduxProfile.on_time_rate || 0).toString(),
+        join_date: reduxProfile.join_date || '',
+        onboarding_progress: reduxProfile.onboarding_progress || 0,
+        onboarding_status: reduxProfile.onboarding_status || 'pending',
+        last_active_at: reduxProfile.last_active_at || '',
+        license_front: reduxProfile.license_front || null,
+        license_back: reduxProfile.license_back || null,
+        insurance_certificate: reduxProfile.insurance_certificate || null,
+        background_check: reduxProfile.background_check || null,
+        preferences: reduxProfile.preferences || []
+      };
+      
+      setProfile(driverProfile);
+      setFormData(driverProfile);
     }
-  };
+  }, [reduxProfile, user]);
 
   const handleSaveProfile = async () => {
     if (!profile) return;
 
     try {
-      const updateData: UpdateProfileRequest = {
+      console.log('=== PROFILE SCREEN - SAVING PROFILE ===');
+      console.log('📝 Current form data:', JSON.stringify(formData, null, 2));
+      
+      const updateData = {
         first_name: formData.first_name || profile.first_name,
         last_name: formData.last_name || profile.last_name,
         email: formData.email || profile.email,
@@ -63,13 +102,30 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
         zip_code: formData.zip_code || profile.zip_code,
       };
 
-      const updatedProfile = await profileService.updateProfile(updateData);
-      setProfile(updatedProfile);
+      console.log('🚀 Dispatching updateProfile with data:', JSON.stringify(updateData, null, 2));
+      
+      // Use Redux action to update profile (this will also update auth state)
+      const result = await dispatch(updateProfile(updateData)).unwrap();
+      
+      console.log('✅ Profile update successful:', JSON.stringify(result, null, 2));
+      
       setIsEditing(false);
-      Alert.alert('Success', 'Profile updated successfully');
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      Alert.alert('Error', 'Failed to update profile');
+      Alert.alert(
+        'Success', 
+        'Profile updated successfully! Changes will be reflected throughout the app.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Optionally refresh the profile data
+              dispatch(fetchProfile());
+            }
+          }
+        ]
+      );
+    } catch (error: any) {
+      console.log('❌ Profile update failed:', error?.message || error);
+      Alert.alert('Error', error?.message || 'Failed to update profile');
     }
   };
 
@@ -77,6 +133,12 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
     setIsEditing(false);
     setFormData(profile || {});
   };
+
+  // Debug logging to check current state
+  useEffect(() => {
+    console.log('👤 ProfileScreen - Current user from auth:', JSON.stringify(user, null, 2));
+    console.log('📋 ProfileScreen - Current profile from Redux:', JSON.stringify(reduxProfile, null, 2));
+  }, [user, reduxProfile]);
 
   const getDisplayValue = (value: string | undefined | null): string => {
     return value && value.trim() !== '' ? value : 'N/A';
@@ -127,7 +189,7 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
         <BackHeader title="Profile" />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Failed to load profile</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchProfile}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => dispatch(fetchProfile())}>
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -270,14 +332,14 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
           </View>
         )}
 
-        {!isEditing && (
+        {/* {!isEditing && (
           <View style={styles.logoutSection}>
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
               <Text style={styles.logoutIcon}>🚪</Text>
               <Text style={styles.logoutButtonText}>Logout</Text>
             </TouchableOpacity>
           </View>
-        )}
+        )} */}
 
         <View style={styles.bottomSpacing} />
       </ScrollView>

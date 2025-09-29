@@ -10,6 +10,8 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
@@ -103,8 +105,15 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
     setSearchText(text);
   };
 
-  const handleLoadMore = () => {
-    if (pagination.has_more && !isLoadingMore) {
+  // Handle infinite scroll - auto load more when near bottom
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 20; // Trigger load when 20px from bottom
+    
+    // Check if user has scrolled near the bottom
+    const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+    
+    if (isCloseToBottom && pagination.has_more && !isLoadingMore && !isLoading) {
       const nextPage = pagination.current_page + 1;
       dispatch(fetchTasks({ 
         status: activeFilter, 
@@ -311,6 +320,8 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        onScroll={handleScroll}
+        scrollEventThrottle={400}
       >
         {isLoading && !refreshing ? (
           <View style={styles.loadingContainer}>
@@ -324,21 +335,12 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
           <>
             {filteredTasks.map(renderTaskCard)}
             
-            {/* Load More Button */}
-            {pagination.has_more && (
-              <TouchableOpacity 
-                style={styles.loadMoreButton}
-                onPress={handleLoadMore}
-                disabled={isLoadingMore}
-              >
-                {isLoadingMore ? (
-                  <ActivityIndicator size="small" color="#007AFF" />
-                ) : (
-                  <Text style={styles.loadMoreText}>
-                    Load More ({pagination.current_page}/{pagination.last_page})
-                  </Text>
-                )}
-              </TouchableOpacity>
+            {/* Loading indicator for infinite scroll */}
+            {isLoadingMore && (
+              <View style={styles.loadingMoreContainer}>
+                <ActivityIndicator size="small" color="#007AFF" />
+                <Text style={styles.loadingMoreText}>Loading more tasks...</Text>
+              </View>
             )}
           </>
         )}
@@ -463,19 +465,16 @@ const styles = StyleSheet.create({
   loadingContainer: { marginTop: 40, alignItems: 'center' },
   emptyContainer: { marginTop: 40, alignItems: 'center' },
   emptyText: { fontSize: 15, color: '#999' },
-  loadMoreButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    marginTop: 16,
-    marginBottom: 16,
-    alignSelf: 'center',
+  loadingMoreContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
   },
-  loadMoreText: {
-    color: '#FFF',
+  loadingMoreText: {
+    marginLeft: 8,
     fontSize: 14,
-    fontWeight: '600',
+    color: '#666',
   },
 });
 
