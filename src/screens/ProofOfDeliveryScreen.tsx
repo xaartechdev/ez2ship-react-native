@@ -66,11 +66,6 @@ const ProofOfDeliveryScreen: React.FC<NavigationProps> = ({ navigation, route })
   };
 
   const handleCompleteDelivery = async () => {
-    if (!otpVerified) {
-      Alert.alert('Verification Required', 'Please verify customer OTP before completing delivery.');
-      return;
-    }
-
     try {
       setLoading(true);
       await orderService.completeDelivery(task.id, {

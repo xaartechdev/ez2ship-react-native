@@ -86,6 +86,7 @@ class TasksService {
     status?: 'all' | 'pending' | 'in_progress' | 'completed';
     search?: string;
     per_page?: number;
+    page?: number;
   }): Promise<TasksResponse> {
     try {
       const response = await apiClient.getTasks(params);

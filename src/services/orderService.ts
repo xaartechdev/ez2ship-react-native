@@ -31,6 +31,7 @@ export interface UpdateStatusRequest {
     latitude: number;
     longitude: number;
   };
+  otp?: string;
 }
 
 export interface ProofOfDelivery {
@@ -174,7 +175,8 @@ class OrderService {
     
     return this.updateOrderStatus(taskId, {
       status: 'delivered',
-      notes: notes
+      notes: notes,
+      otp: proofData?.otp_code
     });
   }
 

@@ -91,10 +91,13 @@ class ApiClient {
         responseData = await response.text();
       }
 
-      // Simple logging: Request params and response
+      // Enhanced logging: Request headers, params and response
       console.log(`🌐 ${method} ${endpoint}`, {
+        url: url,
+        headers: requestHeaders,
         params: body && !(body instanceof FormData) ? body : undefined,
         response: responseData,
+        status: response.status,
         duration: `${requestDuration}ms`
       });
 
@@ -200,6 +203,7 @@ class ApiClient {
     status?: 'all' | 'pending' | 'in_progress' | 'completed';
     search?: string;
     per_page?: number;
+    page?: number;
   }) {
     const queryParams = new URLSearchParams();
     if (params?.status) {
@@ -214,6 +218,7 @@ class ApiClient {
     }
     if (params?.search) queryParams.append('search', params.search);
     if (params?.per_page) queryParams.append('per_page', params.per_page.toString());
+    if (params?.page) queryParams.append('page', params.page.toString());
     
     const queryString = queryParams.toString();
     const endpoint = queryString ? `/driver/tasks?${queryString}` : '/driver/tasks';
@@ -245,6 +250,7 @@ class ApiClient {
       latitude: number;
       longitude: number;
     };
+    otp?: string;
   }) {
     return this.makeRequest(`/driver/tasks/${taskId}/status`, {
       method: 'PUT',
@@ -335,12 +341,13 @@ class ApiClient {
     newPassword: string,
     newPasswordConfirmation: string
   ) {
-    return this.makeRequest('/api/driver/change-password', {
+    console.log('🔐 ChangePassword API Call - Headers will be shown above');
+    return this.makeRequest('/driver/change-password', {
       method: 'POST',
       body: {
         current_password: currentPassword,
-        new_password: newPassword,
-        new_password_confirmation: newPasswordConfirmation,
+        password: newPassword,
+        password_confirmation: newPasswordConfirmation,
       },
     });
   }
@@ -349,11 +356,11 @@ class ApiClient {
     newPassword: string,
     newPasswordConfirmation: string
   ) {
-    return this.makeRequest('/api/driver/update-password', {
+    return this.makeRequest('/driver/change-password', {
       method: 'POST',
       body: {
-        new_password: newPassword,
-        new_password_confirmation: newPasswordConfirmation,
+        password: newPassword,
+        password_confirmation: newPasswordConfirmation,
       },
     });
   }

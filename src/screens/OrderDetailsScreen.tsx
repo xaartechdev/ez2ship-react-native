@@ -183,17 +183,13 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
           break;
         case 'arrived':
         case 'arrived_at_destination':
-          // Complete delivery - check if OTP is verified
-          if (!otpVerified) {
-            Alert.alert('Verification Required', 'Please verify customer OTP before completing delivery.');
-            return;
-          }
-          
+          // Complete delivery - send OTP to API for verification
           await orderService.updateOrderStatus(task.id, {
-            status: 'completed',
-            notes: notes
+            status: 'delivered',
+            notes: notes,
+            otp: otpCode
           });
-          setTask({...task, status: 'completed'});
+          setTask({...task, status: 'delivered'});
           
           Alert.alert(
             'Delivery Completed',

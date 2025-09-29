@@ -75,19 +75,10 @@ const styles = StyleSheet.create({
     marginTop: Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0, // fixes Android overlap
   },
   backButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 22,
-    backgroundColor: '#e3f2fd',
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+   width: 44,
+  height: 44,
+  justifyContent: 'center',
+  alignItems: 'center',
   },
   backButtonText: {
     fontSize: 22,

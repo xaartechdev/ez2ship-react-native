@@ -20,6 +20,7 @@ import {
   setFilter,
   setSearch,
   clearError,
+  resetPagination,
 } from '../store/slices/tasksSlice';
 import { Task } from '../services/tasksService';
 
@@ -29,7 +30,7 @@ interface MyTasksScreenProps {
 
 const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
   const dispatch = useDispatch<AppDispatch>();
-  const { tasks, isLoading, error, filter, search, summary } = useSelector(
+  const { tasks, isLoading, isLoadingMore, error, filter, search, summary, pagination } = useSelector(
     (state: RootState) => state.tasks
   );
 
@@ -37,23 +38,45 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
   const [activeFilter, setActiveFilter] = useState<
     'pending' | 'in_progress' | 'completed'
   >('pending');
+  const [searchText, setSearchText] = useState('');
+
+  // Debounced search effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchText !== search) {
+        dispatch(setSearch(searchText));
+        // Reset pagination and fetch with search
+        dispatch(resetPagination());
+        dispatch(fetchTasks({ 
+          status: activeFilter, 
+          search: searchText,
+          page: 1
+        }));
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchText, search, dispatch, activeFilter]);
 
   useEffect(() => {
     // Load pending tasks by default when component mounts
-    dispatch(fetchTasks({ status: 'pending' }));
+    dispatch(resetPagination());
+    dispatch(fetchTasks({ status: 'pending', page: 1 }));
   }, [dispatch]);
 
   // Refresh data when screen comes into focus (e.g., returning from OrderDetails)
   useFocusEffect(
     React.useCallback(() => {
-      dispatch(fetchTasks({ status: activeFilter }));
-    }, [dispatch, activeFilter])
+      dispatch(resetPagination());
+      dispatch(fetchTasks({ status: activeFilter, search: search, page: 1 }));
+    }, [dispatch, activeFilter, search])
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // Use current active filter when refreshing
-    await dispatch(fetchTasks({ status: activeFilter }));
+    dispatch(resetPagination());
+    // Use current active filter and search when refreshing
+    await dispatch(fetchTasks({ status: activeFilter, search: search, page: 1 }));
     setRefreshing(false);
   };
 
@@ -62,39 +85,8 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
   const inProgressCount = summary?.in_progress || 0;
   const completedCount = summary?.completed || 0;
 
-  const filteredTasks = tasks.filter((task) => {
-    let matchesFilter = false;
-    switch (activeFilter) {
-      case 'pending':
-        matchesFilter =
-          task.status === 'pending' ||
-          task.status === '' ||
-          task.status === 'assigned';
-        break;
-      case 'in_progress':
-        matchesFilter =
-          task.status === 'in_progress' ||
-          task.status === 'picked_up' ||
-          task.status === 'in_transit';
-        break;
-      case 'completed':
-        matchesFilter =
-          task.status === 'delivered' || 
-          task.status === 'cancelled' || 
-          task.status === 'completed';
-        break;
-      default:
-        matchesFilter = true;
-    }
-
-    const matchesSearch =
-      search === '' ||
-      task.customer_name.toLowerCase().includes(search.toLowerCase()) ||
-      task.pickup_address.toLowerCase().includes(search.toLowerCase()) ||
-      task.delivery_address.toLowerCase().includes(search.toLowerCase());
-
-    return matchesFilter && matchesSearch;
-  });
+  // Remove local filtering - use API data directly
+  const filteredTasks = tasks;
 
   const handleFilterPress = (
     filter: 'pending' | 'in_progress' | 'completed'
@@ -102,28 +94,25 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
     setActiveFilter(filter);
     dispatch(setFilter(filter));
     
-    // Map UI filter to API status values - apiClient will handle 'in_progress' to 'in_transit' mapping
-    let apiStatus: 'pending' | 'in_progress' | 'completed';
-    switch (filter) {
-      case 'pending':
-        apiStatus = 'pending';
-        break;
-      case 'in_progress':
-        apiStatus = 'in_progress'; // apiClient will map this to 'in_transit'
-        break;
-      case 'completed':
-        apiStatus = 'completed';
-        break;
-      default:
-        apiStatus = 'pending';
-    }
-    
-    // Make API call with the correct status
-    dispatch(fetchTasks({ status: apiStatus }));
+    // Reset pagination and fetch with new filter
+    dispatch(resetPagination());
+    dispatch(fetchTasks({ status: filter, search: search, page: 1 }));
   };
 
   const handleSearchChange = (text: string) => {
-    dispatch(setSearch(text));
+    setSearchText(text);
+  };
+
+  const handleLoadMore = () => {
+    if (pagination.has_more && !isLoadingMore) {
+      const nextPage = pagination.current_page + 1;
+      dispatch(fetchTasks({ 
+        status: activeFilter, 
+        search: search, 
+        page: nextPage, 
+        loadMore: true 
+      }));
+    }
   };
 
   const handleTaskPress = (task: Task) => {
@@ -279,7 +268,7 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
         <TextInput
           style={styles.searchInput}
           placeholder="Search tasks..."
-          value={search}
+          value={searchText}
           onChangeText={handleSearchChange}
         />
         <TouchableOpacity style={styles.filterIcon}>
@@ -332,7 +321,26 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
             <Text style={styles.emptyText}>No tasks found</Text>
           </View>
         ) : (
-          filteredTasks.map(renderTaskCard)
+          <>
+            {filteredTasks.map(renderTaskCard)}
+            
+            {/* Load More Button */}
+            {pagination.has_more && (
+              <TouchableOpacity 
+                style={styles.loadMoreButton}
+                onPress={handleLoadMore}
+                disabled={isLoadingMore}
+              >
+                {isLoadingMore ? (
+                  <ActivityIndicator size="small" color="#007AFF" />
+                ) : (
+                  <Text style={styles.loadMoreText}>
+                    Load More ({pagination.current_page}/{pagination.last_page})
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -455,6 +463,20 @@ const styles = StyleSheet.create({
   loadingContainer: { marginTop: 40, alignItems: 'center' },
   emptyContainer: { marginTop: 40, alignItems: 'center' },
   emptyText: { fontSize: 15, color: '#999' },
+  loadMoreButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginTop: 16,
+    marginBottom: 16,
+    alignSelf: 'center',
+  },
+  loadMoreText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
 
 export default MyTasksScreen;

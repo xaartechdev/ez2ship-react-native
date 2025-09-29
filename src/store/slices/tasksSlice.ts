@@ -4,6 +4,7 @@ import { tasksService, Task, TasksResponse } from '../../services/tasksService';
 export interface TasksState {
   tasks: Task[];
   isLoading: boolean;
+  isLoadingMore: boolean;
   error: string | null;
   filter: 'all' | 'pending' | 'in_progress' | 'completed';
   search: string;
@@ -28,6 +29,8 @@ export const fetchTasks = createAsyncThunk(
     status?: 'all' | 'pending' | 'in_progress' | 'completed';
     search?: string;
     per_page?: number;
+    page?: number;
+    loadMore?: boolean; // Indicates if this is a load more operation
   } = {}, { rejectWithValue }) => {
     try {
       const response = await tasksService.getTasks(params);
@@ -36,7 +39,7 @@ export const fetchTasks = createAsyncThunk(
         return rejectWithValue(response.message);
       }
       
-      return response;
+      return { ...response, isLoadMore: params.loadMore || false };
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch tasks');
     }
@@ -132,6 +135,7 @@ export const updateTaskStatus = createAsyncThunk(
 const initialState: TasksState = {
   tasks: [],
   isLoading: false,
+  isLoadingMore: false,
   error: null,
   filter: 'all',
   search: '',
@@ -158,40 +162,68 @@ const tasksSlice = createSlice({
     },
     setFilter: (state, action: PayloadAction<'all' | 'pending' | 'in_progress' | 'completed'>) => {
       state.filter = action.payload;
+      // Reset pagination when filter changes
+      state.pagination.current_page = 1;
+      state.tasks = [];
     },
     setSearch: (state, action: PayloadAction<string>) => {
       state.search = action.payload;
+      // Reset pagination when search changes
+      state.pagination.current_page = 1;
+      state.tasks = [];
     },
     clearTasks: (state) => {
       state.tasks = [];
       state.error = null;
+      state.pagination.current_page = 1;
+    },
+    resetPagination: (state) => {
+      state.pagination.current_page = 1;
+      state.tasks = [];
     },
   },
   extraReducers: (builder) => {
     // Fetch Tasks
     builder
-      .addCase(fetchTasks.pending, (state) => {
-        state.isLoading = true;
+      .addCase(fetchTasks.pending, (state, action) => {
+        const isLoadMore = (action.meta.arg as any)?.loadMore;
+        if (isLoadMore) {
+          state.isLoadingMore = true;
+        } else {
+          state.isLoading = true;
+          state.tasks = []; // Clear tasks for fresh load
+        }
         state.error = null;
       })
       .addCase(fetchTasks.fulfilled, (state, action) => {
+        const { isLoadMore, ...response } = action.payload as any;
         state.isLoading = false;
-        if (action.payload.data) {
-          state.tasks = action.payload.data.tasks;
+        state.isLoadingMore = false;
+        
+        if (response.data) {
+          if (isLoadMore) {
+            // Append new tasks for load more
+            state.tasks = [...state.tasks, ...response.data.tasks];
+          } else {
+            // Replace tasks for fresh load
+            state.tasks = response.data.tasks;
+          }
+          
           state.pagination = {
-            ...action.payload.data.pagination,
-            has_more: action.payload.data.pagination.current_page < action.payload.data.pagination.last_page
+            ...response.data.pagination,
+            has_more: response.data.pagination.current_page < response.data.pagination.last_page
           };
           
           // Use summary from API response instead of calculating locally
-          if (action.payload.data.summary) {
-            state.summary = action.payload.data.summary;
+          if (response.data.summary) {
+            state.summary = response.data.summary;
           }
         }
         state.error = null;
       })
       .addCase(fetchTasks.rejected, (state, action) => {
         state.isLoading = false;
+        state.isLoadingMore = false;
         state.error = action.payload as string;
       });
 
@@ -264,5 +296,5 @@ const tasksSlice = createSlice({
   },
 });
 
-export const { clearError, setFilter, setSearch, clearTasks } = tasksSlice.actions;
+export const { clearError, setFilter, setSearch, clearTasks, resetPagination } = tasksSlice.actions;
 export default tasksSlice.reducer;
