@@ -1,5 +1,25 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_CONFIG, ApiResponse } from '../config/api';
+import { API_CONFIG, ApiResponse } from '..      // Check for invalid token response and trigger force logout
+      if (typeof responseData === 'object' && responseData && 
+          responseData.success === false && 
+          (responseData.error_code === 'INVALID_TOKEN' || 
+           responseData.message === 'Invalid or expired token' ||
+           responseData.message === 'Unauthenticated' ||
+           responseData.message?.includes('token') ||
+           response.status === 401)) {
+        console.log('🔒 Invalid/expired token detected, forcing logout...', {
+          error_code: responseData.error_code,
+          message: responseData.message,
+          status: response.status
+        });
+        // Dispatch force logout to immediately clear auth state and storage
+        store.dispatch(forceLogoutAsync());
+        // Also clear storage directly
+        await this.clearStoredAuth();
+        return responseData;
+      };
+import store from '../store';
+import { forceLogoutAsync } from '../store/slices/authSlice';
 
 class ApiClient {
   private baseURL: string;
@@ -16,6 +36,15 @@ class ApiClient {
     } catch (error) {
       console.error('Error getting auth token:', error);
       return null;
+    }
+  }
+
+  private async clearStoredAuth(): Promise<void> {
+    try {
+      await AsyncStorage.multiRemove(['auth_token', 'auth_user']);
+      console.log('🧹 Auth data cleared from storage');
+    } catch (error) {
+      console.error('Error clearing auth data:', error);
     }
   }
 
@@ -100,6 +129,19 @@ class ApiClient {
         status: response.status,
         duration: `${requestDuration}ms`
       });
+
+      // Check for invalid token response and trigger force logout
+      if (typeof responseData === 'object' && responseData && 
+          responseData.success === false && 
+          (responseData.error_code === 'INVALID_TOKEN' || 
+           responseData.message === 'Invalid or expired token')) {
+        console.log('� Invalid/expired token detected, forcing logout...');
+        // Dispatch force logout to immediately clear auth state and storage
+        store.dispatch(forceLogoutAsync());
+        // Also clear storage directly
+        await this.clearStoredAuth();
+        return responseData;
+      }
 
       // Handle different response formats
       if (response.ok) {

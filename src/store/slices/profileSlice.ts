@@ -42,6 +42,58 @@ interface ProfileState {
   error: string | null;
 }
 
+// Async thunk for updating profile
+export const updateProfile = createAsyncThunk(
+  'profile/updateProfile',
+  async (profileData: Partial<ProfileData>, { rejectWithValue, dispatch, getState }) => {
+    try {
+      console.log('=== PROFILE UPDATE START ===');
+      console.log('📝 Profile data to update:', JSON.stringify(profileData, null, 2));
+      
+      // TODO: Replace with actual API call when backend is ready
+      // const response = await apiClient.updateProfile(profileData);
+      
+      // For now, simulate API call with delay
+      await new Promise<void>(resolve => setTimeout(resolve, 1000));
+      
+      // Get current profile data
+      const state = getState() as any;
+      const currentProfile = state.profile.profile;
+      const currentUser = state.auth.user;
+      
+      if (!currentProfile || !currentUser) {
+        throw new Error('No current profile or user data available');
+      }
+      
+      // Merge updated data with current profile
+      const updatedProfile = {
+        ...currentProfile,
+        ...profileData
+      };
+      
+      // Update auth user state with new profile data
+      const authUpdateData: any = {};
+      if (profileData.first_name !== undefined) authUpdateData.first_name = profileData.first_name;
+      if (profileData.last_name !== undefined) authUpdateData.last_name = profileData.last_name;
+      if (profileData.email !== undefined) authUpdateData.email = profileData.email;
+      if (profileData.phone !== undefined) authUpdateData.phone = profileData.phone;
+      if (profileData.profile_image !== undefined) authUpdateData.profile_image = profileData.profile_image;
+      
+      // Import updateUser action from authSlice
+      const { updateUser } = await import('./authSlice');
+      dispatch(updateUser(authUpdateData));
+      
+      console.log('✅ Profile updated successfully');
+      console.log('👤 Updated profile:', JSON.stringify(updatedProfile, null, 2));
+      
+      return updatedProfile;
+    } catch (error: any) {
+      console.log('❌ Profile update failed:', error?.message);
+      return rejectWithValue(error.message || 'Failed to update profile');
+    }
+  }
+);
+
 // Async thunk for fetching profile
 export const fetchProfile = createAsyncThunk(
   'profile/fetchProfile',
@@ -111,6 +163,7 @@ const profileSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // Fetch Profile
       .addCase(fetchProfile.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -120,6 +173,19 @@ const profileSlice = createSlice({
         state.profile = action.payload;
       })
       .addCase(fetchProfile.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      // Update Profile
+      .addCase(updateProfile.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateProfile.fulfilled, (state, action) => {
+        state.loading = false;
+        state.profile = action.payload;
+      })
+      .addCase(updateProfile.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });
