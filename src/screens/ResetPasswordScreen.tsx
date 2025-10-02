@@ -7,8 +7,11 @@ import {
   StyleSheet,
   StatusBar,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Logo } from '../assets/images/Logo';
+import { authService } from '../services/authService';
 
 interface ResetPasswordScreenProps {
   navigation: any;
@@ -16,24 +19,64 @@ interface ResetPasswordScreenProps {
 
 const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSendReset = () => {
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleSendReset = async () => {
+    // Validation
     if (!email) {
       Alert.alert('Error', 'Please enter your email address');
       return;
     }
+
+    if (!validateEmail(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
     
-    // Simulate sending reset email
-    Alert.alert(
-      'Reset Instructions Sent',
-      'Check your email for password reset instructions.',
-      [
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack(),
-        },
-      ]
-    );
+    setLoading(true);
+    
+    try {
+      console.log('📧 FORGOT PASSWORD - Sending reset email', {
+        email,
+        timestamp: new Date().toISOString(),
+      });
+
+      const response = await authService.forgotPassword(email);
+      
+      console.log('📧 FORGOT PASSWORD - API Response', {
+        success: response.success,
+        message: response.message,
+        timestamp: new Date().toISOString(),
+      });
+
+      if (response.success) {
+        Alert.alert(
+          'Reset Instructions Sent',
+          response.message || 'Check your email for password reset instructions.',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.goBack(),
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Error', response.message || 'Failed to send reset email');
+      }
+    } catch (error: any) {
+      console.error('📧 FORGOT PASSWORD - Error', {
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      });
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleBackToLogin = () => {
@@ -49,11 +92,9 @@ const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ navigation })
         <Text style={styles.backButtonText}>←</Text>
       </TouchableOpacity>
 
-      {/* App Icon */}
-      <View style={styles.iconContainer}>
-        <View style={styles.appIcon}>
-          <Text style={styles.iconText}>📱</Text>
-        </View>
+      {/* App Logo */}
+      <View style={styles.logoContainer}>
+        <Logo width={120} height={100} />
       </View>
 
       {/* Title and Instructions */}
@@ -82,8 +123,16 @@ const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ navigation })
         </View>
 
         {/* Send Reset Button */}
-        <TouchableOpacity style={styles.resetButton} onPress={handleSendReset}>
-          <Text style={styles.resetButtonText}>Send Reset Instructions</Text>
+        <TouchableOpacity 
+          style={[styles.resetButton, loading && styles.resetButtonDisabled]} 
+          onPress={handleSendReset}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <Text style={styles.resetButtonText}>Send Reset Instructions</Text>
+          )}
         </TouchableOpacity>
 
         {/* Remember Password */}
@@ -120,29 +169,9 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     fontWeight: '600',
   },
-  iconContainer: {
+  logoContainer: {
     alignItems: 'center',
     marginBottom: 24,
-  },
-  appIcon: {
-    width: 80,
-    height: 80,
-    backgroundColor: '#007AFF',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  iconText: {
-    fontSize: 32,
-    color: 'white',
   },
   title: {
     fontSize: 28,
@@ -210,6 +239,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  resetButtonDisabled: {
+    backgroundColor: '#ccc',
+    shadowOpacity: 0.1,
+    elevation: 2,
   },
   rememberContainer: {
     alignItems: 'center',

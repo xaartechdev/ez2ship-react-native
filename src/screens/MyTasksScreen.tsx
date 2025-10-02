@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,478 +7,475 @@ import {
   TextInput,
   TouchableOpacity,
   StatusBar,
+  RefreshControl,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-interface Task {
-  id: string;
-  orderId: string;
-  customerName: string;
-  type: 'pickup' | 'delivery';
-  address: string;
-  time: string;
-  distance: string;
-  status: 'pending' | 'in-progress' | 'completed';
-  statusLabel?: string;
-  overdue?: boolean;
-}
+import { useDispatch, useSelector } from 'react-redux';
+import { useFocusEffect } from '@react-navigation/native';
+import { RootState, AppDispatch } from '../store';
+import {
+  fetchTasks,
+  setFilter,
+  setSearch,
+  clearError,
+  resetPagination,
+} from '../store/slices/tasksSlice';
+import { Task } from '../services/tasksService';
 
 interface MyTasksScreenProps {
   navigation: any;
 }
 
 const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
-  const [activeFilter, setActiveFilter] = useState<'pending' | 'in-progress' | 'completed'>('pending');
+  const dispatch = useDispatch<AppDispatch>();
+  const { tasks, isLoading, isLoadingMore, error, filter, search, summary, pagination } = useSelector(
+    (state: RootState) => state.tasks
+  );
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<
+    'pending' | 'in_progress' | 'completed'
+  >('pending');
   const [searchText, setSearchText] = useState('');
 
-  // Mock task data
-  const tasks: Task[] = [
-    {
-      id: '1',
-      orderId: 'ORD-2024-001',
-      customerName: 'Sarah Johnson',
-      type: 'pickup',
-      address: '123 Warehouse St, Industrial District, CA 90210',
-      time: '2:30 PM',
-      distance: '12.5 miles',
-      status: 'pending',
-      statusLabel: 'Ready',
-      overdue: true,
-    },
-    {
-      id: '2',
-      orderId: 'ORD-2024-002',
-      customerName: 'Mike Chen',
-      type: 'delivery',
-      address: '321 Office Plaza, Business District, CA 90213',
-      time: '5:00 PM',
-      distance: '8.2 miles',
-      status: 'in-progress',
-      statusLabel: 'In Transit',
-      overdue: true,
-    },
-    {
-      id: '3',
-      orderId: 'ORD-2024-003',
-      customerName: 'Emily Davis',
-      type: 'delivery',
-      address: '777 Retail Center, North Hills, CA 90215',
-      time: '7:30 PM',
-      distance: '15.7 miles',
-      status: 'in-progress',
-      statusLabel: 'At Destination',
-      overdue: true,
-    },
-  ];
+  // Debounced search effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchText !== search) {
+        dispatch(setSearch(searchText));
+        // Reset pagination and fetch with search
+        dispatch(resetPagination());
+        dispatch(fetchTasks({ 
+          status: activeFilter, 
+          search: searchText,
+          page: 1
+        }));
+      }
+    }, 500); // 500ms debounce
 
-  const filteredTasks = tasks.filter(task => {
-    const matchesFilter = task.status === activeFilter;
-    const matchesSearch = task.orderId.toLowerCase().includes(searchText.toLowerCase()) ||
-                         task.customerName.toLowerCase().includes(searchText.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+    return () => clearTimeout(timeoutId);
+  }, [searchText, search, dispatch, activeFilter]);
 
-  const getTaskCounts = () => {
-    return {
-      pending: tasks.filter(t => t.status === 'pending').length,
-      'in-progress': tasks.filter(t => t.status === 'in-progress').length,
-      completed: tasks.filter(t => t.status === 'completed').length,
-    };
+  useEffect(() => {
+    // Load pending tasks by default when component mounts
+    dispatch(resetPagination());
+    dispatch(fetchTasks({ status: 'pending', page: 1 }));
+  }, [dispatch]);
+
+  // Refresh data when screen comes into focus (e.g., returning from OrderDetails)
+  useFocusEffect(
+    React.useCallback(() => {
+      dispatch(resetPagination());
+      dispatch(fetchTasks({ status: activeFilter, search: search, page: 1 }));
+    }, [dispatch, activeFilter, search])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    dispatch(resetPagination());
+    // Use current active filter and search when refreshing
+    await dispatch(fetchTasks({ status: activeFilter, search: search, page: 1 }));
+    setRefreshing(false);
   };
 
-  const taskCounts = getTaskCounts();
+  // Use counts from API summary instead of calculating locally
+  const pendingCount = summary?.pending || 0;
+  const inProgressCount = summary?.in_progress || 0;
+  const completedCount = summary?.completed || 0;
+
+  // Remove local filtering - use API data directly
+  const filteredTasks = tasks;
+
+  const handleFilterPress = (
+    filter: 'pending' | 'in_progress' | 'completed'
+  ) => {
+    setActiveFilter(filter);
+    dispatch(setFilter(filter));
+    
+    // Reset pagination and fetch with new filter
+    dispatch(resetPagination());
+    dispatch(fetchTasks({ status: filter, search: search, page: 1 }));
+  };
+
+  const handleSearchChange = (text: string) => {
+    setSearchText(text);
+  };
+
+  const handleLoadMore = () => {
+    if (pagination.has_more && !isLoadingMore) {
+      const nextPage = pagination.current_page + 1;
+      dispatch(fetchTasks({ 
+        status: activeFilter, 
+        search: search, 
+        page: nextPage, 
+        loadMore: true 
+      }));
+    }
+  };
+
+  const handleTaskPress = (task: Task) => {
+    navigation.navigate('OrderDetails', { task });
+  };
+
+  const handleCallCustomer = (phoneNumber: string) => {
+    Alert.alert('Call Customer', `Call ${phoneNumber}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Call',
+        onPress: () => {
+          console.log('Calling:', phoneNumber);
+        },
+      },
+    ]);
+  };
 
   const renderTaskCard = (task: Task) => (
-    <View key={task.id} style={styles.taskCard}>
-      {/* Task Header */}
+    <TouchableOpacity
+      key={task.id}
+      style={styles.taskCard}
+      onPress={() => handleTaskPress(task)}
+    >
       <View style={styles.taskHeader}>
-        <View style={styles.taskHeaderLeft}>
-          <View style={styles.taskIconContainer}>
-            {task.status === 'completed' ? (
-              <Text style={styles.taskIcon}>✅</Text>
-            ) : task.status === 'in-progress' ? (
-              <Text style={styles.taskIcon}>⚠️</Text>
-            ) : (
-              <Text style={styles.taskIcon}>▶️</Text>
-            )}
-          </View>
-          <View style={styles.taskInfo}>
-            <Text style={styles.orderId}>{task.orderId}</Text>
-            <Text style={styles.customerName}>{task.customerName}</Text>
-          </View>
-        </View>
-        <View style={styles.taskHeaderRight}>
-          <View style={[
-            styles.statusBadge,
-            task.status === 'in-progress' ? styles.inProgressBadge : styles.readyBadge
-          ]}>
-            <Text style={[
-              styles.badgeStatusText,
-              task.status === 'in-progress' ? styles.inProgressText : styles.readyText
-            ]}>
-              {task.statusLabel || task.status}
+        <Text style={styles.taskId}>{task.order_id}</Text>
+        <View style={styles.statusContainer}>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: getStatusColor(task.status) },
+            ]}
+          >
+            <Text style={styles.statusText}>
+              {getStatusText(task.status, task.is_overdue)}
             </Text>
           </View>
-          {task.overdue && (
+          {task.is_overdue && (
             <Text style={styles.overdueText}>Overdue</Text>
           )}
         </View>
       </View>
 
-      {/* Task Details */}
-      <View style={styles.taskDetails}>
-        <View style={styles.taskType}>
-          <Text style={styles.typeIcon}>
-            {task.type === 'pickup' ? '🟢' : '🟢'}
-          </Text>
-          <Text style={styles.typeText}>
-            {task.type === 'pickup' ? 'Pickup' : 'Delivery'}
-          </Text>
+      <Text style={styles.customerName}>{task.customer_name}</Text>
+
+      <View style={styles.addressSection}>
+        <View style={styles.typeIndicator}>
+          <View style={styles.greenDot} />
+          <Text style={styles.typeText}>Pickup</Text>
         </View>
-        <Text style={styles.address}>{task.address}</Text>
-        
+        <Text style={styles.address}>{task.pickup_address}</Text>
+
         <View style={styles.taskMeta}>
           <View style={styles.metaItem}>
             <Text style={styles.metaIcon}>🕐</Text>
-            <Text style={styles.metaText}>{task.time}</Text>
+            <Text style={styles.metaText}>
+              {task.scheduled_pickup
+                ? new Date(task.scheduled_pickup).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : 'TBD'}
+            </Text>
           </View>
           <View style={styles.metaItem}>
             <Text style={styles.metaIcon}>📍</Text>
-            <Text style={styles.metaText}>{task.distance}</Text>
+            <Text style={styles.metaText}>{task.distance} miles</Text>
           </View>
-          <TouchableOpacity style={styles.callButton}>
+          <TouchableOpacity
+            style={styles.callButton}
+            onPress={() => handleCallCustomer(task.customer_phone)}
+          >
             <Text style={styles.callIcon}>📞</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Action Button */}
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => navigation.navigate('OrderDetails', { 
-            orderId: task.orderId, 
-            taskId: task.id 
-          })}
-        >
-          <Text style={styles.actionButtonText}>View Details</Text>
-        </TouchableOpacity>
       </View>
-    </View>
+    </TouchableOpacity>
   );
+
+  const getStatusText = (status: string, isOverdue: boolean) => {
+    if (isOverdue) return 'Overdue';
+    switch (status) {
+      case 'pending':
+      case '':
+      case 'assigned':
+        return 'Ready';
+      case 'in_progress':
+        return 'In Progress';
+      case 'picked_up':
+        return 'Picked Up';
+      case 'in_transit':
+        return 'In Transit';
+      case 'delivered':
+        return 'Delivered';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return 'Ready';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+      case '':
+      case 'assigned':
+        return '#007AFF';
+      case 'in_progress':
+        return '#007AFF';
+      case 'picked_up':
+      case 'in_transit':
+        return '#FF9500';
+      case 'delivered':
+        return '#34C759';
+      case 'cancelled':
+        return '#FF3B30';
+      default:
+        return '#007AFF';
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>My Tasks</Text>
       </View>
 
-      {/* Filter Tabs */}
-      <View style={styles.filtersContainer}>
-        <View style={styles.filterTabs}>
-          {(['pending', 'in-progress', 'completed'] as const).map((filter) => (
-            <TouchableOpacity
-              key={filter}
-              style={[
-                styles.filterTab,
-                activeFilter === filter && styles.activeFilterTab
-              ]}
-              onPress={() => setActiveFilter(filter)}
-            >
-              <Text style={styles.filterNumber}>
-                {taskCounts[filter]}
-              </Text>
-              <Text style={[
-                styles.filterText,
-                activeFilter === filter && styles.activeFilterText
-              ]}>
-                {filter === 'pending' ? 'Pending' : 
-                 filter === 'in-progress' ? 'In Progress' : 'Completed'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+      {/* Compact Summary Row */}
+      <View style={styles.summaryRow}>
+        <View style={styles.summaryBox}>
+          <Text style={styles.summaryCount}>{pendingCount}</Text>
+          <Text style={styles.summaryText}>Pending</Text>
+        </View>
+        <View style={styles.summaryBox}>
+          <Text style={[styles.summaryCount, { color: '#007AFF' }]}>
+            {inProgressCount}
+          </Text>
+          <Text style={styles.summaryText}>In Progress</Text>
+        </View>
+        <View style={styles.summaryBox}>
+          <Text style={[styles.summaryCount, { color: '#34C759' }]}>
+            {completedCount}
+          </Text>
+          <Text style={styles.summaryText}>Completed</Text>
         </View>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <View style={styles.searchInputContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search tasks..."
-            value={searchText}
-            onChangeText={setSearchText}
-          />
-        </View>
-        <TouchableOpacity style={styles.filterButton}>
-          <Text style={styles.filterButtonIcon}>🔽</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search tasks..."
+          value={searchText}
+          onChangeText={handleSearchChange}
+        />
+        <TouchableOpacity style={styles.filterIcon}>
+          <Text style={styles.filterIconText}>⚙</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Filter Status */}
-      <View style={styles.statusContainer}>
-        <Text style={styles.statusText}>
-          {activeFilter === 'pending' ? 'Pending (1)' : 
-           activeFilter === 'in-progress' ? 'In Progress (2)' : 'Completed (2)'}
-        </Text>
+      {/* Tabs */}
+      <View style={styles.tabsContainer}>
+        {[
+          { key: 'pending', label: `Pending (${pendingCount})` },
+          { key: 'in_progress', label: `In Progress (${inProgressCount})` },
+          { key: 'completed', label: `Completed (${completedCount})` },
+        ].map((tab) => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[
+              styles.tab,
+              activeFilter === tab.key && styles.activeTab,
+            ]}
+            onPress={() =>
+              handleFilterPress(tab.key as 'pending' | 'in_progress' | 'completed')
+            }
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeFilter === tab.key && styles.activeTabText,
+              ]}
+            >
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* Tasks List */}
-      <ScrollView style={styles.tasksList} showsVerticalScrollIndicator={false}>
-        {filteredTasks.map(renderTaskCard)}
-        
-        {/* Bottom spacing for tab bar */}
-        <View style={styles.bottomSpacing} />
+      <ScrollView
+        style={styles.tasksList}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {isLoading && !refreshing ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#007AFF" />
+          </View>
+        ) : filteredTasks.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No tasks found</Text>
+          </View>
+        ) : (
+          <>
+            {filteredTasks.map(renderTaskCard)}
+            
+            {/* Load More Button */}
+            {pagination.has_more && (
+              <TouchableOpacity 
+                style={styles.loadMoreButton}
+                onPress={handleLoadMore}
+                disabled={isLoadingMore}
+              >
+                {isLoadingMore ? (
+                  <ActivityIndicator size="small" color="#007AFF" />
+                ) : (
+                  <Text style={styles.loadMoreText}>
+                    Load More ({pagination.current_page}/{pagination.last_page})
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
   header: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 16,
+    paddingBottom: 10,
+    backgroundColor: '#FFF',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1a1a1a',
-  },
-  filtersContainer: {
-    paddingHorizontal: 24,
-    marginBottom: 20,
-  },
-  filterTabs: {
+  title: { fontSize: 22, fontWeight: '600', color: '#000' },
+
+  summaryRow: {
     flexDirection: 'row',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 4,
-  },
-  filterTab: {
-    flex: 1,
+    justifyContent: 'space-around',
     paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
+    backgroundColor: '#FFF',
   },
-  activeFilterTab: {
-    backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  filterNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 2,
-  },
-  filterText: {
-    fontSize: 12,
-    color: '#6c757d',
-    fontWeight: '500',
-  },
-  activeFilterText: {
-    color: '#007AFF',
-  },
+  summaryBox: { alignItems: 'center' },
+  summaryCount: { fontSize: 18, fontWeight: '600', color: '#FF9500' },
+  summaryText: { fontSize: 13, color: '#666' },
+
   searchContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 24,
-    marginBottom: 16,
-  },
-  searchInputContainer: {
-    flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 48,
-    marginRight: 12,
-  },
-  searchIcon: {
-    fontSize: 16,
-    marginRight: 12,
+    padding: 12,
+    backgroundColor: '#FFF',
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    color: '#1a1a1a',
-  },
-  filterButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  filterButtonIcon: {
-    fontSize: 16,
-  },
-  statusContainer: {
-    paddingHorizontal: 24,
-    marginBottom: 16,
-  },
-  statusText: {
+    height: 38,
+    borderColor: '#E0E0E0',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    backgroundColor: '#F9F9F9',
     fontSize: 14,
-    color: '#6c757d',
-    fontWeight: '500',
   },
-  tasksList: {
-    flex: 1,
-    paddingHorizontal: 24,
+  filterIcon: {
+    marginLeft: 8,
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: '#F1F1F1',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  taskCard: {
-    backgroundColor: '#ffffff',
+  filterIconText: { fontSize: 16, color: '#666' },
+
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    justifyContent: 'space-around',
+  },
+  tab: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF9500',
+    backgroundColor: '#F1F1F1',
+  },
+  activeTab: { backgroundColor: '#007AFF' },
+  tabText: { fontSize: 12, color: '#666', fontWeight: '500' },
+  activeTabText: { color: '#FFF' },
+
+  tasksList: { flex: 1, padding: 16 },
+  taskCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 10,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+    elevation: 1,
   },
   taskHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 6,
   },
-  taskHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+  taskId: { fontSize: 14, color: '#666', fontWeight: '500' },
+  statusContainer: { flexDirection: 'row', alignItems: 'center' },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
-  taskIconContainer: {
-    marginRight: 12,
-  },
-  taskIcon: {
-    fontSize: 20,
-  },
-  taskInfo: {
-    flex: 1,
-  },
-  orderId: {
+  statusText: { fontSize: 10, color: '#FFF', fontWeight: '600' },
+  overdueText: { marginLeft: 4, color: '#FF3B30', fontSize: 12 },
+  customerName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 2,
+    marginBottom: 6,
+    color: '#000',
   },
-  customerName: {
-    fontSize: 14,
-    color: '#6c757d',
-  },
-  taskHeaderRight: {
-    alignItems: 'flex-end',
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    marginBottom: 4,
-  },
-  inProgressBadge: {
-    backgroundColor: '#007AFF',
-  },
-  readyBadge: {
-    backgroundColor: '#007AFF',
-  },
-  badgeStatusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  inProgressText: {
-    color: '#ffffff',
-  },
-  readyText: {
-    color: '#ffffff',
-  },
-  overdueText: {
-    fontSize: 12,
-    color: '#FF3B30',
-    fontWeight: '600',
-  },
-  taskDetails: {
-    marginTop: 8,
-  },
-  taskType: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  typeIcon: {
-    fontSize: 12,
-    marginRight: 8,
-  },
-  typeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  address: {
-    fontSize: 14,
-    color: '#6c757d',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  taskMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metaIcon: {
-    fontSize: 14,
+  addressSection: { marginTop: 4 },
+  typeIndicator: { flexDirection: 'row', alignItems: 'center' },
+  greenDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#34C759',
     marginRight: 6,
   },
-  metaText: {
-    fontSize: 14,
-    color: '#6c757d',
-    marginRight: 16,
-  },
-  callButton: {
-    padding: 8,
-  },
-  callIcon: {
-    fontSize: 16,
-  },
-  actionButton: {
-    backgroundColor: '#007bff',
+  typeText: { fontSize: 12, color: '#666' },
+  address: { fontSize: 14, color: '#333', marginTop: 2 },
+  taskMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', marginRight: 12 },
+  metaIcon: { marginRight: 4 },
+  metaText: { fontSize: 12, color: '#666' },
+  callButton: { marginLeft: 'auto' },
+  callIcon: { fontSize: 16 },
+  loadingContainer: { marginTop: 40, alignItems: 'center' },
+  emptyContainer: { marginTop: 40, alignItems: 'center' },
+  emptyText: { fontSize: 15, color: '#999' },
+  loadMoreButton: {
+    backgroundColor: '#007AFF',
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     borderRadius: 8,
-    marginTop: 12,
-    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 16,
+    alignSelf: 'center',
   },
-  actionButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
+  loadMoreText: {
+    color: '#FFF',
+    fontSize: 14,
     fontWeight: '600',
-  },
-  bottomSpacing: {
-    height: 100,
   },
 });
 

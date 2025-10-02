@@ -1,0 +1,7 @@
+{
+  "react-native.packager.port": 8081,
+  "react-native-tools.showUserTips": false,
+  "react-native-tools.projectRoot": "${workspaceFolder}",
+  "react-native-tools.logLevel": "Trace",
+  "react-native.enableCodeLens": true
+}

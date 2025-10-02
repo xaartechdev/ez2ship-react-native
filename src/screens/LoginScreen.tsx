@@ -15,6 +15,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { login, clearError } from '../store/slices/authSlice';
 import { Button, Input, Loading } from '../components/common';
 import { ENV } from '../config/environment';
+import { Logo } from '../assets/images/Logo';
 
 interface LoginScreenProps {
   navigation: any;
@@ -22,19 +23,22 @@ interface LoginScreenProps {
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const dispatch = useAppDispatch();
-  const { isLoading, error, isAuthenticated } = useAppSelector(state => state.auth);
+  const { isLoading, error, isAuthenticated, user } = useAppSelector(state => state.auth);
 
-  const [email, setEmail] = useState('john.smith@ez2ship.com');
+  const [email, setEmail] = useState('driver1@test.com');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigation.replace('Main');
+    console.log('LoginScreen useEffect - isAuthenticated:', isAuthenticated, 'user:', user);
+    if (isAuthenticated && user) {
+      // Navigation will be handled automatically by RootNavigator based on is_first_login
+      // No need to navigate manually here anymore
+      console.log('User logged in successfully, RootNavigator will handle navigation');
     }
-  }, [isAuthenticated, navigation]);
+  }, [isAuthenticated, user, navigation]);
 
   useEffect(() => {
     if (error) {
@@ -81,7 +85,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       await dispatch(login({
         email: email.trim().toLowerCase(),
         password,
-        deviceId: 'device-id-placeholder', // In real app, get from device
+        device_name: 'React Native App', // Updated to match API
       })).unwrap();
     } catch (error) {
       // Error is already handled in useEffect
@@ -117,11 +121,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* App Icon */}
-          <View style={styles.iconContainer}>
-            <View style={styles.appIcon}>
-              <Text style={styles.iconText}>📱</Text>
-            </View>
+          {/* App Logo */}
+          <View style={styles.logoContainer}>
+            <Logo width={140} height={110} />
           </View>
 
           {/* App Title */}
@@ -206,28 +208,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: ENV.DIMENSIONS.PADDING * 2,
   },
-  iconContainer: {
+  logoContainer: {
     alignItems: 'center',
     marginBottom: ENV.DIMENSIONS.MARGIN * 2,
-  },
-  appIcon: {
-    width: 80,
-    height: 80,
-    backgroundColor: ENV.COLORS.PRIMARY,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: ENV.COLORS.BLACK,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  iconText: {
-    fontSize: 40,
+    marginTop: ENV.DIMENSIONS.MARGIN,
   },
   title: {
     fontSize: ENV.FONT_SIZES.TITLE,

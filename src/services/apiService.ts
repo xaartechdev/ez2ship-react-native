@@ -30,7 +30,7 @@ class ApiService {
     this.instance.interceptors.request.use(
       async (config) => {
         try {
-          const token = await AsyncStorage.getItem('token');
+          const token = await AsyncStorage.getItem('auth_token');
           if (token) {
             config.headers.Authorization = `Bearer ${token}`;
           }
@@ -60,7 +60,7 @@ class ApiService {
             const refreshToken = await AsyncStorage.getItem('refreshToken');
             if (refreshToken) {
               const response = await this.refreshToken(refreshToken);
-              await AsyncStorage.setItem('token', response.data.token);
+              await AsyncStorage.setItem('auth_token', response.data.token);
               
               // Retry the original request with new token
               originalRequest.headers.Authorization = `Bearer ${response.data.token}`;
@@ -68,7 +68,7 @@ class ApiService {
             }
           } catch (refreshError) {
             // Refresh failed, redirect to login
-            await AsyncStorage.multiRemove(['token', 'refreshToken', 'user']);
+            await AsyncStorage.multiRemove(['auth_token', 'refreshToken', 'auth_user']);
             // You can emit an event here to navigate to login screen
             console.error('Token refresh failed:', refreshError);
           }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,97 +6,112 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
+  RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch } from '../store';
+import {
+  fetchNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  deleteNotification,
+  selectNotifications,
+  selectUnreadCount,
+  selectNotificationsLoading,
+  selectNotificationsError,
+  clearError,
+} from '../store/slices/notificationsSlice';
+import { notificationsService } from '../services/notificationsService';
 
 interface AlertsScreenProps {
   navigation: any;
 }
 
-interface Notification {
-  id: string;
-  type: 'new_order' | 'trip_update' | 'message' | 'cancelled';
-  title: string;
-  message: string;
-  date: string;
-  isRead: boolean;
-  icon: string;
-  iconColor: string;
-}
-
 const AlertsScreen: React.FC<AlertsScreenProps> = ({ navigation }) => {
+  const dispatch = useDispatch<AppDispatch>();
+  const notifications = useSelector(selectNotifications);
+  const unreadCount = useSelector(selectUnreadCount);
+  const loading = useSelector(selectNotificationsLoading);
+  const error = useSelector(selectNotificationsError);
+
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread'>('all');
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'new_order',
-      title: 'New Order Assigned',
-      message: 'Order ORD-2024-006 has been assigned to you',
-      date: '15/1/2024',
-      isRead: false,
-      icon: '📦',
-      iconColor: '#007AFF',
-    },
-    {
-      id: '2',
-      type: 'trip_update',
-      title: 'Trip Update',
-      message: 'Pickup time changed for ORD-2024-002',
-      date: '15/1/2024',
-      isRead: false,
-      icon: '🕐',
-      iconColor: '#FF9500',
-    },
-    {
-      id: '3',
-      type: 'message',
-      title: 'Message from Dispatcher',
-      message: 'Please confirm your availability for tomorrow',
-      date: '14/1/2024',
-      isRead: true,
-      icon: '💬',
-      iconColor: '#34C759',
-    },
-    {
-      id: '4',
-      type: 'cancelled',
-      title: 'Order Cancelled',
-      message: 'Order ORD-2024-003 has been cancelled',
-      date: '14/1/2024',
-      isRead: true,
-      icon: '❌',
-      iconColor: '#FF3B30',
-    },
-  ]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    dispatch(fetchNotifications());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (error) {
+      Alert.alert('Error', error);
+      dispatch(clearError());
+    }
+  }, [error, dispatch]);
 
   const filteredNotifications = notifications.filter(notification => {
     if (activeFilter === 'unread') {
-      return !notification.isRead;
+      return !notification.read_at;
     }
     return true;
   });
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
   const allCount = notifications.length;
 
-  const handleMarkAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id 
-          ? { ...notification, isRead: true }
-          : notification
-      )
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await dispatch(fetchNotifications());
+    setRefreshing(false);
+  };
+
+  const handleMarkAsRead = async (id: number) => {
+    try {
+      await dispatch(markNotificationAsRead(id));
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await dispatch(markAllNotificationsAsRead());
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  };
+
+  const handleDismiss = async (id: number) => {
+    Alert.alert(
+      'Delete Notification',
+      'Are you sure you want to delete this notification?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await dispatch(deleteNotification(id));
+            } catch (error) {
+              console.error('Error deleting notification:', error);
+            }
+          },
+        },
+      ]
     );
   };
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(prev => 
-      prev.map(notification => ({ ...notification, isRead: true }))
-    );
+  const getNotificationIcon = (type: string) => {
+    return notificationsService.getNotificationIcon(type as any);
   };
 
-  const handleDismiss = (id: string) => {
-    setNotifications(prev => prev.filter(notification => notification.id !== id));
+  const getNotificationColor = (type: string) => {
+    return notificationsService.getNotificationColor(type as any);
+  };
+
+  const formatDate = (dateString: string) => {
+    return notificationsService.formatNotificationDate(dateString);
   };
 
   return (
@@ -106,9 +121,11 @@ const AlertsScreen: React.FC<AlertsScreenProps> = ({ navigation }) => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Notifications</Text>
-        <TouchableOpacity onPress={handleMarkAllAsRead}>
-          <Text style={styles.markAllReadText}>Mark all read</Text>
-        </TouchableOpacity>
+        {unreadCount > 0 && (
+          <TouchableOpacity onPress={handleMarkAllAsRead}>
+            <Text style={styles.markAllReadText}>Mark all read</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Filter Tabs */}
@@ -145,56 +162,89 @@ const AlertsScreen: React.FC<AlertsScreenProps> = ({ navigation }) => {
       </View>
 
       {/* Notifications List */}
-      <ScrollView style={styles.notificationsList} showsVerticalScrollIndicator={false}>
-        {filteredNotifications.map((notification) => (
-          <View key={notification.id} style={styles.notificationCard}>
-            <View style={[
-              styles.notificationBorder,
-              { backgroundColor: notification.iconColor }
-            ]} />
+      <ScrollView 
+        style={styles.notificationsList} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={['#007AFF']}
+            tintColor="#007AFF"
+          />
+        }
+      >
+        {filteredNotifications.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>🔔</Text>
+            <Text style={styles.emptyTitle}>
+              {activeFilter === 'unread' ? 'No unread notifications' : 'No notifications'}
+            </Text>
+            <Text style={styles.emptyMessage}>
+              {activeFilter === 'unread' 
+                ? 'All caught up! No new notifications to read.'
+                : 'You have no notifications at this time.'
+              }
+            </Text>
+          </View>
+        ) : (
+          filteredNotifications.map((notification) => {
+            const iconColor = getNotificationColor(notification.type);
+            const icon = getNotificationIcon(notification.type);
             
-            <View style={styles.notificationContent}>
-              <View style={styles.notificationHeader}>
-                <View style={styles.notificationLeft}>
-                  <View style={[
-                    styles.notificationIcon,
-                    { backgroundColor: `${notification.iconColor}20` }
-                  ]}>
-                    <Text style={styles.notificationIconText}>{notification.icon}</Text>
-                  </View>
-                  <View style={styles.notificationInfo}>
-                    <Text style={styles.notificationTitle}>{notification.title}</Text>
-                    <Text style={styles.notificationMessage}>{notification.message}</Text>
-                    <Text style={styles.notificationDate}>{notification.date}</Text>
-                  </View>
-                </View>
+            return (
+              <View key={notification.id} style={styles.notificationCard}>
+                <View style={[
+                  styles.notificationBorder,
+                  { backgroundColor: iconColor }
+                ]} />
                 
-                <View style={styles.notificationActions}>
-                  {!notification.isRead && (
-                    <View style={styles.unreadDot} />
-                  )}
-                  <View style={styles.actionButtons}>
-                    {!notification.isRead && (
-                      <TouchableOpacity 
-                        style={styles.markReadButton}
-                        onPress={() => handleMarkAsRead(notification.id)}
-                      >
-                        <Text style={styles.markReadIcon}>✓</Text>
-                        <Text style={styles.markReadText}>Mark read</Text>
-                      </TouchableOpacity>
-                    )}
-                    <TouchableOpacity 
-                      style={styles.dismissButton}
-                      onPress={() => handleDismiss(notification.id)}
-                    >
-                      <Text style={styles.dismissIcon}>✕</Text>
-                    </TouchableOpacity>
+                <View style={styles.notificationContent}>
+                  <View style={styles.notificationHeader}>
+                    <View style={styles.notificationLeft}>
+                      <View style={[
+                        styles.notificationIcon,
+                        { backgroundColor: `${iconColor}20` }
+                      ]}>
+                        <Text style={styles.notificationIconText}>{icon}</Text>
+                      </View>
+                      <View style={styles.notificationInfo}>
+                        <Text style={styles.notificationTitle}>{notification.title}</Text>
+                        <Text style={styles.notificationMessage}>{notification.message}</Text>
+                        <Text style={styles.notificationDate}>
+                          {formatDate(notification.created_at)}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.notificationActions}>
+                      {!notification.read_at && (
+                        <View style={styles.unreadDot} />
+                      )}
+                      <View style={styles.actionButtons}>
+                        {!notification.read_at && (
+                          <TouchableOpacity 
+                            style={styles.markReadButton}
+                            onPress={() => handleMarkAsRead(notification.id)}
+                          >
+                            <Text style={styles.markReadIcon}>✓</Text>
+                            <Text style={styles.markReadText}>Mark read</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity 
+                          style={styles.dismissButton}
+                          onPress={() => handleDismiss(notification.id)}
+                        >
+                          <Text style={styles.dismissIcon}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
                   </View>
                 </View>
               </View>
-            </View>
-          </View>
-        ))}
+            );
+          })
+        )}
         
         <View style={styles.bottomSpacing} />
       </ScrollView>
@@ -370,6 +420,31 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 100,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+    paddingHorizontal: 40,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+    opacity: 0.5,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyMessage: {
+    fontSize: 14,
+    color: '#6c757d',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
 

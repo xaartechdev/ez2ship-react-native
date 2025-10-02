@@ -83,11 +83,11 @@ const Input: React.FC<InputProps> = ({
 
   const textInputStyle = [
     styles.textInput,
-    leftIcon && styles.textInputWithLeftIcon,
-    rightIcon && styles.textInputWithRightIcon,
-    multiline && styles.textInputMultiline,
+    leftIcon ? styles.textInputWithLeftIcon : undefined,
+    rightIcon ? styles.textInputWithRightIcon : undefined,
+    multiline ? styles.textInputMultiline : undefined,
     inputStyle,
-  ];
+  ].filter(Boolean);
 
   const currentLabelStyle = [
     styles.label,

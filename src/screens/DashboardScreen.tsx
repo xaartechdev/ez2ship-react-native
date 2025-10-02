@@ -1,114 +1,213 @@
-import React from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   StatusBar,
-  Dimensions,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-const { width } = Dimensions.get('window');
+import { useSelector } from 'react-redux';
+import { authService } from '../services/authService';
+import { dashboardService, DashboardData } from '../services/dashboardService';
+import { RootState } from '../store';
 
 interface DashboardScreenProps {
   navigation: any;
 }
 
 const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigation }) => {
-  // Chart data for weekly performance
-  const chartData = [
-    { day: 'Mon', value: 85 },
-    { day: 'Tue', value: 95 },
-    { day: 'Wed', value: 80 },
-    { day: 'Thu', value: 70 },
-    { day: 'Fri', value: 90 },
-    { day: 'Sat', value: 85 },
-    { day: 'Sun', value: 95 },
-  ];
+  const [userName, setUserName] = useState('User');
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const { user } = useSelector((state: RootState) => state.auth);
 
-  const maxValue = Math.max(...chartData.map(item => item.value));
+  // Get dynamic greeting based on current time
+  const getGreeting = () => {
+    const hour = currentTime.getHours();
+    
+    if (hour >= 5 && hour < 12) {
+      return 'Good morning';
+    } else if (hour >= 12 && hour < 17) {
+      return 'Good afternoon';
+    } else if (hour >= 17 && hour < 22) {
+      return 'Good evening';
+    } else {
+      return 'Good night';
+    }
+  };
+
+  // Get dynamic subtitle based on time of day
+  const getSubtitle = () => {
+    const hour = currentTime.getHours();
+    
+    if (hour >= 5 && hour < 12) {
+      return 'Ready for your deliveries?';
+    } else if (hour >= 12 && hour < 17) {
+      return 'How are your deliveries going?';
+    } else if (hour >= 17 && hour < 22) {
+      return 'Finishing up your deliveries?';
+    } else {
+      return 'Time to rest after a good day!';
+    }
+  };
+
+  // Update time every minute to keep greeting current
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Get user name
+  useEffect(() => {
+    const getUserName = async () => {
+      try {
+        if (user) {
+          const fullName = `${user.first_name} ${user.last_name}`.trim();
+          setUserName(fullName || 'User');
+        } else {
+          const fullName = await authService.getUserFullName();
+          setUserName(fullName);
+        }
+      } catch (error) {
+        console.error('Error getting user name:', error);
+        setUserName('User');
+      }
+    };
+
+    getUserName();
+  }, [user]);
+
+  // Load dashboard data
+  const loadDashboardData = async () => {
+    try {
+      console.log('📱 DASHBOARD SCREEN - STARTING DATA LOAD');
+      setLoading(true);
+      const data = await dashboardService.getDashboardData();
+      console.log('📱 DASHBOARD SCREEN - DATA LOADED SUCCESSFULLY', data);
+      setDashboardData(data);
+    } catch (error: any) {
+      console.error('📱 DASHBOARD SCREEN - ERROR:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadDashboardData();
+    setRefreshing(false);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.greeting}>Good morning, John</Text>
-          <Text style={styles.subtitle}>Ready for your deliveries?</Text>
-        </View>
-
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statsRow}>
-            {/* Today's Orders */}
-            <View style={[styles.statCard, styles.ordersCard]}>
-              <View style={styles.statIconContainer}>
-                <Text style={styles.statIcon}>📦</Text>
-              </View>
-              <Text style={styles.statValue}>12</Text>
-              <Text style={styles.statLabel}>Today's Orders</Text>
-            </View>
-
-            {/* On-Time Rate */}
-            <View style={[styles.statCard, styles.rateCard]}>
-              <View style={styles.statIconContainer}>
-                <Text style={styles.statIcon}>📈</Text>
-              </View>
-              <Text style={styles.statValue}>95%</Text>
-              <Text style={styles.statLabel}>On-Time Rate</Text>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.greeting}>{getGreeting()}, {userName}</Text>
+              <Text style={styles.subtitle}>{getSubtitle()}</Text>
             </View>
           </View>
         </View>
 
-        {/* Weekly Performance Chart */}
-        <View style={styles.chartContainer}>
-          <View style={styles.chartHeader}>
-            <Text style={styles.chartTitle}>Weekly Performance</Text>
-            <Text style={styles.chartIcon}>📊</Text>
+        {loading && !dashboardData ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#007AFF" />
+            <Text style={styles.loadingText}>Loading dashboard...</Text>
           </View>
-          
-          <View style={styles.chart}>
-            <View style={styles.chartBars}>
-              {chartData.map((item, index) => (
-                <View key={index} style={styles.barContainer}>
-                  <View style={styles.barWrapper}>
-                    <View
-                      style={[
-                        styles.bar,
-                        {
-                          height: (item.value / maxValue) * 120,
-                        },
-                      ]}
-                    />
+        ) : (
+          <>
+            {/* Stats Cards */}
+            <View style={styles.statsContainer}>
+              <View style={styles.statsRow}>
+                {/* Today's Orders */}
+                <View style={[styles.statCard, styles.ordersCard]}>
+                  <View style={styles.statIconContainer}>
+                    <Text style={styles.statIcon}>📦</Text>
                   </View>
-                  <Text style={styles.barLabel}>{item.day}</Text>
+                  <Text style={styles.statValue}>
+                    {dashboardData?.today_orders || 0}
+                  </Text>
+                  <Text style={styles.statLabel}>Today's Orders</Text>
                 </View>
-              ))}
-            </View>
-          </View>
 
-          {/* Weekly Stats */}
-          <View style={styles.weeklyStats}>
-            <View style={styles.weeklyStatItem}>
-              <Text style={styles.weeklyStatValue}>58</Text>
-              <Text style={styles.weeklyStatLabel}>Completed</Text>
+                {/* On-Time Rate */}
+                <View style={[styles.statCard, styles.rateCard]}>
+                  <View style={styles.statIconContainer}>
+                    <Text style={styles.statIcon}>📈</Text>
+                  </View>
+                  <Text style={styles.statValue}>
+                    {dashboardData?.monthly_stats 
+                      ? dashboardService.formatPercentage(dashboardData.monthly_stats.on_time_rate)
+                      : '0%'
+                    }
+                  </Text>
+                  <Text style={styles.statLabel}>On-Time Rate</Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.weeklyStatItem}>
-              <Text style={styles.weeklyStatValue}>$1,240</Text>
-              <Text style={styles.weeklyStatLabel}>Earned</Text>
-            </View>
-            <View style={styles.weeklyStatItem}>
-              <Text style={styles.weeklyStatValue}>92%</Text>
-              <Text style={styles.weeklyStatLabel}>On-Time</Text>
-            </View>
-          </View>
-        </View>
 
-        {/* Bottom spacing for tab bar */}
-        <View style={styles.bottomSpacing} />
+            {/* Performance Chart */}
+            <View style={styles.chartContainer}>
+              <View style={styles.chartHeader}>
+                <Text style={styles.chartTitle}>Performance Overview</Text>
+                <Text style={styles.chartIcon}>📊</Text>
+              </View>
+              
+              {/* Weekly Statistics */}
+              <View style={styles.weeklyStats}>
+                <View style={styles.weeklyStatItem}>
+                  <Text style={styles.weeklyStatValue}>
+                    {dashboardData?.monthly_stats?.completed_orders || 0}
+                  </Text>
+                  <Text style={styles.weeklyStatLabel}>Completed</Text>
+                </View>
+                <View style={styles.weeklyStatItem}>
+                  <Text style={styles.weeklyStatValue}>
+                    {dashboardData?.monthly_stats 
+                      ? dashboardService.formatEarnings(dashboardData.monthly_stats.total_earnings)
+                      : '$0'
+                    }
+                  </Text>
+                  <Text style={styles.weeklyStatLabel}>Earned</Text>
+                </View>
+                <View style={styles.weeklyStatItem}>
+                  <Text style={styles.weeklyStatValue}>
+                    {dashboardData?.monthly_stats 
+                      ? dashboardService.formatPercentage(dashboardData.monthly_stats.on_time_rate)
+                      : '0%'
+                    }
+                  </Text>
+                  <Text style={styles.weeklyStatLabel}>On-Time</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Bottom spacing */}
+            <View style={styles.bottomSpacing} />
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -126,6 +225,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 24,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   greeting: {
     fontSize: 24,
@@ -219,37 +323,6 @@ const styles = StyleSheet.create({
   chartIcon: {
     fontSize: 20,
   },
-  chart: {
-    height: 160,
-    marginBottom: 24,
-  },
-  chartBars: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 140,
-    paddingHorizontal: 8,
-  },
-  barContainer: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  barWrapper: {
-    height: 120,
-    justifyContent: 'flex-end',
-    marginBottom: 8,
-  },
-  bar: {
-    width: 20,
-    backgroundColor: '#007AFF',
-    borderRadius: 4,
-    minHeight: 4,
-  },
-  barLabel: {
-    fontSize: 12,
-    color: '#6c757d',
-    fontWeight: '500',
-  },
   weeklyStats: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -273,6 +346,18 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 100,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6c757d',
+    fontWeight: '500',
   },
 });
 

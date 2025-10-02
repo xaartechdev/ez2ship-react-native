@@ -1,0 +1,35 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Attach to packager",
+            "type": "reactnative",
+            "request": "attach",
+            "cwd": "${workspaceFolder}",
+            "port": 8081
+        },
+        {
+            "name": "Debug Android",
+            "type": "reactnative",
+            "request": "launch",
+            "platform": "android",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Debug iOS",
+            "type": "reactnative",
+            "request": "launch",
+            "platform": "ios",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Start Metro",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/node_modules/react-native/cli.js",
+            "args": ["start"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        }
+    ]
+}
