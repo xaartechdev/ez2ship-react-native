@@ -41,6 +41,7 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
     'pending' | 'in_progress' | 'completed'
   >('pending');
   const [searchText, setSearchText] = useState('');
+  const [lastLoadMoreTrigger, setLastLoadMoreTrigger] = useState(0);
 
   // Debounced search effect
   useEffect(() => {
@@ -108,12 +109,35 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
   // Handle infinite scroll - auto load more when near bottom
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-    const paddingToBottom = 20; // Trigger load when 20px from bottom
     
-    // Check if user has scrolled near the bottom
-    const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+    // Only trigger if we have actual content
+    if (contentSize.height <= 0) return;
+    
+    // Calculate how close we are to the bottom (using percentage for better mobile experience)
+    const threshold = 100; // Trigger when 100px from bottom
+    const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - threshold;
+    
+    // Add debug logging
+    console.log('📱 SCROLL DEBUG:', {
+      contentHeight: contentSize.height,
+      scrollY: contentOffset.y,
+      screenHeight: layoutMeasurement.height,
+      distanceFromBottom: contentSize.height - (layoutMeasurement.height + contentOffset.y),
+      isCloseToBottom,
+      hasMore: pagination.has_more,
+      isLoadingMore,
+      isLoading
+    });
     
     if (isCloseToBottom && pagination.has_more && !isLoadingMore && !isLoading) {
+      // Prevent multiple rapid calls with debounce
+      const now = Date.now();
+      if (now - lastLoadMoreTrigger < 1000) { // 1 second debounce
+        return;
+      }
+      
+      console.log('🚀 TRIGGERING LOAD MORE - Page:', pagination.current_page + 1);
+      setLastLoadMoreTrigger(now);
       const nextPage = pagination.current_page + 1;
       dispatch(fetchTasks({ 
         status: activeFilter, 
@@ -317,11 +341,15 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
       {/* Tasks List */}
       <ScrollView
         style={styles.tasksList}
+        contentContainerStyle={{ flexGrow: 1 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         onScroll={handleScroll}
-        scrollEventThrottle={400}
+        scrollEventThrottle={200}
+        showsVerticalScrollIndicator={true}
+        nestedScrollEnabled={true}
+        keyboardShouldPersistTaps="handled"
       >
         {isLoading && !refreshing ? (
           <View style={styles.loadingContainer}>
@@ -470,11 +498,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 20,
+    paddingHorizontal: 20,
+    backgroundColor: '#F5F5F5',
+    marginTop: 10,
+    borderRadius: 8,
+    marginHorizontal: 16,
   },
   loadingMoreText: {
     marginLeft: 8,
     fontSize: 14,
     color: '#666',
+    fontWeight: '500',
   },
 });
 

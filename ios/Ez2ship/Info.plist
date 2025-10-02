@@ -34,6 +34,19 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string/>
+	
+	<!-- Permissions for document upload -->
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to camera to capture documents for delivery proof</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to photo library to select documents for delivery proof</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>This app needs access to save captured documents to photo library</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>This app needs access to documents folder to upload delivery documents</string>
+	<key>NSFileSystemAccessUsageDescription</key>
+	<string>This app needs file system access to manage delivery documents</string>
+	
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

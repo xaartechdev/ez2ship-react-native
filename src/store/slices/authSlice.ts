@@ -82,6 +82,18 @@ export const checkAuthStatus = createAsyncThunk(
   }
 );
 
+export const forceLogoutAsync = createAsyncThunk(
+  'auth/forceLogout',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await authService.forceLogout();
+      return response;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Force logout failed');
+    }
+  }
+);
+
 const initialState: AuthState = {
   user: null,
   token: null,
@@ -104,6 +116,14 @@ const authSlice = createSlice({
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;
+    },
+    forceLogout: (state) => {
+      // Force logout without API call (for invalid token scenarios)
+      state.user = null;
+      state.token = null;
+      state.isAuthenticated = false;
+      state.error = null;
+      state.isLoading = false;
     },
   },
   extraReducers: (builder) => {
@@ -194,8 +214,30 @@ const authSlice = createSlice({
         state.error = action.payload as string;
         state.isAuthenticated = false;
       });
+
+    // Force Logout (for invalid token scenarios)
+    builder
+      .addCase(forceLogoutAsync.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(forceLogoutAsync.fulfilled, (state) => {
+        state.isLoading = false;
+        state.user = null;
+        state.token = null;
+        state.isAuthenticated = false;
+        state.error = null;
+        console.log('🔒 Force logout completed - user redirected to login');
+      })
+      .addCase(forceLogoutAsync.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+        // Still log out locally even if clearing fails
+        state.user = null;
+        state.token = null;
+        state.isAuthenticated = false;
+      });
   },
 });
 
-export const { clearError, updateUser, setLoading } = authSlice.actions;
+export const { clearError, updateUser, setLoading, forceLogout } = authSlice.actions;
 export default authSlice.reducer;

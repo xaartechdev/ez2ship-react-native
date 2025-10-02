@@ -147,6 +147,23 @@ class AuthService {
     }
   }
 
+  async forceLogout(): Promise<{ success: boolean; message: string }> {
+    try {
+      // Force logout without API call (for invalid token scenarios)
+      await this.clearAuthData();
+      
+      return {
+        success: true,
+        message: 'Logged out due to invalid token',
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: 'Failed to clear auth data',
+      };
+    }
+  }
+
   async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
     try {
       const response = await apiClient.forgotPassword(email);
