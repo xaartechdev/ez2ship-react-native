@@ -1,4 +1,4 @@
-package com.myrapp
+package com.ez2ship
 
 import android.app.Application
 import com.facebook.react.PackageList

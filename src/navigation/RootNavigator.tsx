@@ -3,7 +3,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSelector } from 'react-redux';
-import { Text } from 'react-native';
+import { Text, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootState } from '../store';
 
 // Screens
@@ -34,6 +35,8 @@ const TabIcon = ({ icon, color }: { icon: string; color: string }) => (
 
 // Bottom Tab Navigator for main app screens
 const MainTabNavigator = () => {
+  const insets = useSafeAreaInsets();
+  
   return (
     <Tab.Navigator
       screenOptions={{
@@ -44,9 +47,16 @@ const MainTabNavigator = () => {
           backgroundColor: '#ffffff',
           borderTopWidth: 1,
           borderTopColor: '#e9ecef',
-          paddingBottom: 5,
-          paddingTop: 5,
-          height: 60,
+          paddingBottom: Math.max(insets.bottom, 8),
+          paddingTop: 8,
+          height: Platform.OS === 'ios' 
+            ? 60 + insets.bottom 
+            : 60 + Math.max(insets.bottom, 8),
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
         },
         tabBarLabelStyle: {
           fontSize: 12,

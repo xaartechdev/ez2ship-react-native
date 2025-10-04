@@ -23,10 +23,63 @@ class ApiClient {
 
   private async clearStoredAuth(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove(['auth_token', 'auth_user']);
+      await AsyncStorage.multiRemove(['auth_token', 'auth_user', 'refresh_token', 'token_expires_at', 'refresh_expires_at']);
       console.log('🧹 Auth data cleared from storage');
     } catch (error) {
       console.error('Error clearing auth data:', error);
+    }
+  }
+
+  private async attemptTokenRefresh(): Promise<{ success: boolean; message: string }> {
+    try {
+      // Get refresh token directly from storage to avoid circular imports
+      const refreshToken = await AsyncStorage.getItem('refresh_token');
+      const refreshExpiryString = await AsyncStorage.getItem('refresh_expires_at');
+      
+      if (!refreshToken) {
+        return { success: false, message: 'No refresh token available' };
+      }
+
+      // Check if refresh token is expired
+      if (refreshExpiryString) {
+        const expiryDate = new Date(refreshExpiryString);
+        const now = new Date();
+        if (expiryDate <= now) {
+          return { success: false, message: 'Refresh token expired' };
+        }
+      }
+      
+      console.log('🔄 Attempting token refresh...');
+      const refreshResult = await this.refreshToken(refreshToken);
+      
+      if (refreshResult.success && refreshResult.data) {
+        const tokenData = refreshResult.data as any;
+        const currentUser = await AsyncStorage.getItem('auth_user');
+        
+        // Store new token data
+        await AsyncStorage.setItem('auth_token', tokenData.access_token || tokenData.token);
+        
+        if (tokenData.refresh_token) {
+          await AsyncStorage.setItem('refresh_token', tokenData.refresh_token);
+        }
+        
+        if (tokenData.expires_at) {
+          await AsyncStorage.setItem('token_expires_at', tokenData.expires_at);
+        }
+        
+        if (tokenData.refresh_expires_at) {
+          await AsyncStorage.setItem('refresh_expires_at', tokenData.refresh_expires_at);
+        }
+        
+        console.log('✅ Token refresh successful');
+        return { success: true, message: 'Token refreshed successfully' };
+      } else {
+        console.log('❌ Token refresh failed:', refreshResult.message);
+        return { success: false, message: refreshResult.message || 'Token refresh failed' };
+      }
+    } catch (error: any) {
+      console.error('❌ Token refresh error:', error);
+      return { success: false, message: error.message || 'Token refresh failed' };
     }
   }
 
@@ -112,7 +165,7 @@ class ApiClient {
         duration: `${requestDuration}ms`
       });
 
-      // Check for invalid token response and trigger force logout
+      // Check for invalid token response and attempt refresh
       if (typeof responseData === 'object' && responseData && 
           responseData.success === false && 
           (responseData.error_code === 'INVALID_TOKEN' || 
@@ -120,16 +173,27 @@ class ApiClient {
            responseData.message === 'Unauthenticated' ||
            responseData.message?.includes('token') ||
            response.status === 401)) {
-        console.log('🔒 Invalid/expired token detected, forcing logout...', {
+        
+        console.log('🔒 Invalid/expired token detected, attempting refresh...', {
           error_code: responseData.error_code,
           message: responseData.message,
           status: response.status
         });
-        // Dispatch force logout to immediately clear auth state and storage
-        store.dispatch(forceLogoutAsync());
-        // Also clear storage directly
-        await this.clearStoredAuth();
-        return responseData;
+
+        // Try to refresh the token
+        const refreshResult = await this.attemptTokenRefresh();
+        
+        if (refreshResult.success) {
+          console.log('✅ Token refreshed successfully, retrying original request...');
+          // Retry the original request with the new token
+          return this.makeRequest(endpoint, options);
+        } else {
+          console.log('❌ Token refresh failed, logging out user...', refreshResult.message);
+          // If refresh fails, force logout
+          store.dispatch(forceLogoutAsync());
+          await this.clearStoredAuth();
+          return responseData;
+        }
       }
 
       // Handle different response formats
@@ -205,6 +269,17 @@ class ApiClient {
   async logout() {
     return this.makeRequest('/driver/logout', {
       method: 'POST',
+    });
+  }
+
+  async refreshToken(refreshToken: string, deviceName: string = 'React Native App') {
+    return this.makeRequest('/driver/refresh-token', {
+      method: 'POST',
+      body: { 
+        refresh_token: refreshToken,
+        device_name: deviceName 
+      },
+      requireAuth: false, // Don't require auth for refresh token endpoint
     });
   }
 

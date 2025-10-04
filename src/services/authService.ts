@@ -42,6 +42,9 @@ export interface AuthResponse {
     driver: User;
     token: string;
     token_type: string;
+    refresh_token?: string;
+    expires_at?: string;
+    refresh_expires_at?: string;
   };
   errors?: Record<string, string[]>;
 }
@@ -49,6 +52,9 @@ export interface AuthResponse {
 class AuthService {
   private tokenKey = 'auth_token';
   private userKey = 'auth_user';
+  private refreshTokenKey = 'refresh_token';
+  private tokenExpiryKey = 'token_expires_at';
+  private refreshExpiryKey = 'refresh_expires_at';
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
@@ -61,10 +67,17 @@ class AuthService {
       console.log('AuthService login response:', response);
 
       if (response.success && response.data) {
-        const loginData = response.data as LoginResponse;
-        console.log('Login data driver:', loginData.driver);
-        // Store token and user data
-        await this.storeAuthData(loginData.token, loginData.driver);
+        const loginData = response.data as any; // Use any to access all properties
+        console.log('Login data:', loginData);
+        
+        // Store token, user data, and refresh token
+        await this.storeAuthData(
+          loginData.token, 
+          loginData.driver, 
+          loginData.refresh_token,
+          loginData.expires_at,
+          loginData.refresh_expires_at
+        );
         
         return {
           success: true,
@@ -73,6 +86,9 @@ class AuthService {
             driver: loginData.driver,
             token: loginData.token,
             token_type: loginData.token_type,
+            refresh_token: loginData.refresh_token,
+            expires_at: loginData.expires_at,
+            refresh_expires_at: loginData.refresh_expires_at,
           },
         };
       }
@@ -97,8 +113,15 @@ class AuthService {
 
       if (response.success && response.data) {
         const registerData = response.data as RegisterResponse;
-        // Store token and user data
-        await this.storeAuthData(registerData.token, registerData.driver);
+        // Store token and user data (register might also return refresh token)
+        const regData = response.data as any;
+        await this.storeAuthData(
+          registerData.token, 
+          registerData.driver,
+          regData.refresh_token,
+          regData.expires_at,
+          regData.refresh_expires_at
+        );
         
         return {
           success: true,
@@ -223,16 +246,37 @@ class AuthService {
     }
   }
 
-  private async storeAuthData(token: string, user: User | any): Promise<void> {
+  private async storeAuthData(
+    token: string, 
+    user: User | any, 
+    refreshToken?: string,
+    expiresAt?: string,
+    refreshExpiresAt?: string
+  ): Promise<void> {
     try {
-      console.log('AuthService storing user data:', user);
-      console.log('User is_first_login before storage:', user.is_first_login);
+      console.log('AuthService storing auth data:', {
+        user,
+        hasRefreshToken: !!refreshToken,
+        expiresAt,
+        refreshExpiresAt
+      });
+      
       await AsyncStorage.setItem(this.tokenKey, token);
       await AsyncStorage.setItem(this.userKey, JSON.stringify(user));
       
-      // Verify storage
-      const storedUser = await AsyncStorage.getItem(this.userKey);
-      console.log('AuthService stored user verification:', storedUser);
+      if (refreshToken) {
+        await AsyncStorage.setItem(this.refreshTokenKey, refreshToken);
+      }
+      
+      if (expiresAt) {
+        await AsyncStorage.setItem(this.tokenExpiryKey, expiresAt);
+      }
+      
+      if (refreshExpiresAt) {
+        await AsyncStorage.setItem(this.refreshExpiryKey, refreshExpiresAt);
+      }
+      
+      console.log('AuthService auth data stored successfully');
     } catch (error) {
       console.error('Error storing auth data:', error);
       throw error;
@@ -241,7 +285,14 @@ class AuthService {
 
   private async clearAuthData(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove([this.tokenKey, this.userKey]);
+      await AsyncStorage.multiRemove([
+        this.tokenKey, 
+        this.userKey, 
+        this.refreshTokenKey,
+        this.tokenExpiryKey,
+        this.refreshExpiryKey
+      ]);
+      console.log('🧹 All auth data cleared from storage');
     } catch (error) {
       console.error('Error clearing auth data:', error);
     }
@@ -258,6 +309,144 @@ class AuthService {
     // For EZ2Ship API, we'll assume email verification is handled server-side
     // and not required for the mobile app
     return false;
+  }
+
+  // Get stored refresh token
+  async getStoredRefreshToken(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem(this.refreshTokenKey);
+    } catch (error) {
+      console.error('Error getting stored refresh token:', error);
+      return null;
+    }
+  }
+
+  // Check if access token is expired
+  async isTokenExpired(): Promise<boolean> {
+    try {
+      const expiryString = await AsyncStorage.getItem(this.tokenExpiryKey);
+      if (!expiryString) return false;
+      
+      const expiryDate = new Date(expiryString);
+      const now = new Date();
+      
+      // Check if token expires in the next 5 minutes (buffer for network delays)
+      const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+      
+      return expiryDate <= fiveMinutesFromNow;
+    } catch (error) {
+      console.error('Error checking token expiry:', error);
+      return false;
+    }
+  }
+
+  // Check if refresh token is expired
+  async isRefreshTokenExpired(): Promise<boolean> {
+    try {
+      const expiryString = await AsyncStorage.getItem(this.refreshExpiryKey);
+      if (!expiryString) return false;
+      
+      const expiryDate = new Date(expiryString);
+      const now = new Date();
+      
+      return expiryDate <= now;
+    } catch (error) {
+      console.error('Error checking refresh token expiry:', error);
+      return false;
+    }
+  }
+
+  // Refresh access token using refresh token
+  async refreshToken(): Promise<AuthResponse> {
+    try {
+      console.log('🔄 Attempting to refresh access token...');
+      
+      const refreshToken = await this.getStoredRefreshToken();
+      if (!refreshToken) {
+        console.log('❌ No refresh token available');
+        return {
+          success: false,
+          message: 'No refresh token available',
+        };
+      }
+
+      // Check if refresh token is expired
+      if (await this.isRefreshTokenExpired()) {
+        console.log('❌ Refresh token is expired');
+        return {
+          success: false,
+          message: 'Refresh token expired',
+        };
+      }
+
+      const response = await apiClient.refreshToken(refreshToken);
+      console.log('🔄 Refresh token response:', response);
+
+      if (response.success && response.data) {
+        const tokenData = response.data as any;
+        const currentUser = await this.getStoredUser();
+        
+        // Store new token data (keep existing user data)
+        await this.storeAuthData(
+          tokenData.access_token || tokenData.token,
+          currentUser,
+          tokenData.refresh_token,
+          tokenData.expires_at,
+          tokenData.refresh_expires_at
+        );
+
+        console.log('✅ Token refreshed successfully');
+        return {
+          success: true,
+          message: 'Token refreshed successfully',
+          data: {
+            driver: currentUser!,
+            token: tokenData.access_token || tokenData.token,
+            token_type: tokenData.token_type || 'Bearer',
+            refresh_token: tokenData.refresh_token,
+            expires_at: tokenData.expires_at,
+            refresh_expires_at: tokenData.refresh_expires_at,
+          },
+        };
+      }
+
+      console.log('❌ Token refresh failed:', response.message);
+      return {
+        success: false,
+        message: response.message || 'Token refresh failed',
+      };
+    } catch (error: any) {
+      console.error('❌ Token refresh error:', error);
+      return {
+        success: false,
+        message: error.message || 'Token refresh failed',
+      };
+    }
+  }
+
+  // Proactively refresh token if it's about to expire
+  async ensureValidToken(): Promise<boolean> {
+    try {
+      const isExpired = await this.isTokenExpired();
+      
+      if (isExpired) {
+        console.log('🔄 Token is expiring soon, refreshing proactively...');
+        const refreshResult = await this.refreshToken();
+        
+        if (refreshResult.success) {
+          console.log('✅ Proactive token refresh successful');
+          return true;
+        } else {
+          console.log('❌ Proactive token refresh failed');
+          return false;
+        }
+      }
+      
+      return true; // Token is still valid
+    } catch (error) {
+      console.error('Error ensuring valid token:', error);
+      return false;
+    }
   }
 
   // Helper method to get user's full name
