@@ -74,21 +74,39 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   };
 
   const handleLogin = async () => {
+    console.log('🚀 Login process started');
     const isEmailValid = validateEmail(email);
     const isPasswordValid = validatePassword(password);
 
     if (!isEmailValid || !isPasswordValid) {
+      console.log('❌ Validation failed');
       return;
     }
 
     try {
-      await dispatch(login({
+      console.log('📡 Starting login dispatch...');
+      // Add timeout protection to prevent ANR
+      const loginPromise = dispatch(login({
         email: email.trim().toLowerCase(),
         password,
-        device_name: 'React Native App', // Updated to match API
+        device_name: 'React Native App',
       })).unwrap();
-    } catch (error) {
-      // Error is already handled in useEffect
+
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          console.log('⏰ Login timeout triggered');
+          reject(new Error('Login timeout - please try again'));
+        }, 30000); // 30 second timeout
+      });
+
+      await Promise.race([loginPromise, timeoutPromise]);
+      console.log('✅ Login completed successfully');
+    } catch (error: any) {
+      console.error('❌ Login error:', error);
+      if (error.message.includes('timeout')) {
+        Alert.alert('Login Timeout', 'Login is taking too long. Please check your connection and try again.');
+      }
+      // Other errors are handled in useEffect
     }
   };
 

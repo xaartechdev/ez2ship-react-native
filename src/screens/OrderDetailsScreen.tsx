@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {orderService} from '../services/orderService';
+import { useLocationTracking } from '../hooks/useLocationTracking';
 
 interface Task {
   id: number;
@@ -48,6 +49,7 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
   const {task: initialTask} = route.params;
   const [task, setTask] = useState<Task>(initialTask);
   const [notes, setNotes] = useState('');
+  const { startTracking, stopTracking, getTrackingStatus } = useLocationTracking();
   const [loading, setLoading] = useState(false);
   
   // OTP and Proof of Delivery states
@@ -170,6 +172,10 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
             notes: notes
           });
           setTask({...task, status: 'in_transit'});
+          
+          // Start location tracking for this order
+          console.log('🚀 Order status changed to in_transit, starting location tracking...');
+          await startTracking(task.order_id);
           break;
         case 'in_progress':
         case 'picked_up':
@@ -190,6 +196,10 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
             otp: otpCode
           });
           setTask({...task, status: 'delivered'});
+          
+          // Stop location tracking as delivery is completed
+          console.log('🛑 Order completed, stopping location tracking...');
+          stopTracking();
           
           Alert.alert(
             'Delivery Completed',

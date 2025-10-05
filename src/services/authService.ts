@@ -1,11 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from './apiClient';
 import { LoginResponse, RegisterResponse } from '../config/api';
+import { deviceService } from './deviceService';
 
 export interface LoginCredentials {
   email: string;
   password: string;
   device_name?: string;
+  device_id?: string;
 }
 
 export interface RegisterData {
@@ -16,6 +18,7 @@ export interface RegisterData {
   password: string;
   password_confirmation: string;
   device_name?: string;
+  device_id?: string;
 }
 
 export interface User {
@@ -58,10 +61,28 @@ class AuthService {
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
+      // Generate or get existing device ID with timeout protection
+      let deviceId: string;
+      try {
+        deviceId = await Promise.race([
+          deviceService.getDeviceId(),
+          new Promise<string>((resolve) => {
+            setTimeout(() => {
+              console.warn('⚠️ Device ID generation taking too long, using fallback');
+              resolve(`fallback_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`);
+            }, 3000);
+          })
+        ]);
+      } catch (error) {
+        console.error('Device ID error, using fallback:', error);
+        deviceId = `fallback_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      }
+      
       const response = await apiClient.login(
         credentials.email,
         credentials.password,
-        credentials.device_name || 'React Native App'
+        credentials.device_name || 'React Native App',
+        deviceId
       );
 
       console.log('AuthService login response:', response);
@@ -109,7 +130,11 @@ class AuthService {
 
   async register(data: RegisterData): Promise<AuthResponse> {
     try {
-      const response = await apiClient.register(data);
+      // Generate or get existing device ID
+      const deviceId = await deviceService.getDeviceId();
+      const dataWithDeviceId = { ...data, device_id: deviceId };
+      
+      const response = await apiClient.register(dataWithDeviceId);
 
       if (response.success && response.data) {
         const registerData = response.data as RegisterResponse;
@@ -218,7 +243,14 @@ class AuthService {
 
   async getStoredToken(): Promise<string | null> {
     try {
-      return await AsyncStorage.getItem(this.tokenKey);
+      // Add timeout protection
+      const timeoutPromise = new Promise<string | null>((resolve) => {
+        setTimeout(() => resolve(null), 2000); // 2 second timeout
+      });
+      
+      const tokenPromise = AsyncStorage.getItem(this.tokenKey);
+      
+      return await Promise.race([tokenPromise, timeoutPromise]);
     } catch (error) {
       console.error('Error getting stored token:', error);
       return null;
@@ -227,7 +259,14 @@ class AuthService {
 
   async getStoredUser(): Promise<User | null> {
     try {
-      const userString = await AsyncStorage.getItem(this.userKey);
+      // Add timeout protection
+      const timeoutPromise = new Promise<string | null>((resolve) => {
+        setTimeout(() => resolve(null), 2000); // 2 second timeout
+      });
+      
+      const userPromise = AsyncStorage.getItem(this.userKey);
+      const userString = await Promise.race([userPromise, timeoutPromise]);
+      
       return userString ? JSON.parse(userString) : null;
     } catch (error) {
       console.error('Error getting stored user:', error);
@@ -237,13 +276,31 @@ class AuthService {
 
   async isAuthenticated(): Promise<boolean> {
     try {
-      const token = await this.getStoredToken();
-      const user = await this.getStoredUser();
-      return !!(token && user);
+      // Add timeout protection to prevent ANR during startup
+      const timeoutPromise = new Promise<boolean>((resolve) => {
+        setTimeout(() => {
+          console.warn('⚠️ Auth check timeout, assuming not authenticated');
+          resolve(false);
+        }, 3000); // 3 second timeout
+      });
+      
+      const authCheckPromise = this.performAuthCheck();
+      
+      return await Promise.race([authCheckPromise, timeoutPromise]);
     } catch (error) {
       console.error('Error checking authentication:', error);
       return false;
     }
+  }
+  
+  private async performAuthCheck(): Promise<boolean> {
+    // Use Promise.all to run storage operations in parallel
+    const [token, user] = await Promise.all([
+      this.getStoredToken().catch(() => null),
+      this.getStoredUser().catch(() => null)
+    ]);
+    
+    return !!(token && user);
   }
 
   private async storeAuthData(

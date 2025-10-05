@@ -239,10 +239,15 @@ class ApiClient {
   }
 
   // Authentication methods
-  async login(email: string, password: string, deviceName: string = 'React Native App') {
+  async login(email: string, password: string, deviceName: string = 'React Native App', deviceId: string) {
     return this.makeRequest('/driver/login', {
       method: 'POST',
-      body: { email, password, device_name: deviceName },
+      body: { 
+        email, 
+        password, 
+        device_name: deviceName,
+        device_id: deviceId 
+      },
       requireAuth: false,
     });
   }
@@ -255,12 +260,14 @@ class ApiClient {
     password: string;
     password_confirmation: string;
     device_name?: string;
+    device_id?: string;
   }) {
     return this.makeRequest('/driver/register', {
       method: 'POST',
       body: {
         ...data,
         device_name: data.device_name || 'React Native App',
+        device_id: data.device_id,
       },
       requireAuth: false,
     });
@@ -468,6 +475,31 @@ class ApiClient {
         password: newPassword,
         password_confirmation: newPasswordConfirmation,
       },
+    });
+  }
+
+  // Location tracking methods
+  async sendLocationUpdate(locationData: {
+    order_id: string;
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    timestamp: string;
+    speed?: number | null;
+    heading?: number | null;
+    altitude?: number | null;
+  }) {
+    return this.makeRequest('/driver/location-update', {
+      method: 'POST',
+      body: locationData,
+    });
+  }
+
+  // Generic POST method for location service
+  async post(endpoint: string, data: any) {
+    return this.makeRequest(endpoint, {
+      method: 'POST',
+      body: data,
     });
   }
 }
