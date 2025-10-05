@@ -106,6 +106,25 @@ class OrderService {
   }
 
   /**
+   * Update order status with delivery documents (multipart/form-data)
+   */
+  async updateOrderStatusWithDocuments(taskId: number, updateData: UpdateStatusRequest & { delivery_documents: any[] }): Promise<void> {
+    try {
+      console.log('📄 Updating order status with documents:', { taskId, updateData });
+      
+      const response = await apiClient.updateTaskStatusWithDocuments(taskId, updateData);
+      console.log('📄 Document upload response:', response);
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to update order status with documents');
+      }
+    } catch (error: any) {
+      console.error('❌ Error updating order status with documents:', error);
+      throw new Error(error.message || 'Failed to update order status with documents');
+    }
+  }
+
+  /**
    * Accept a pending task
    */
   async acceptTask(taskId: number): Promise<void> {

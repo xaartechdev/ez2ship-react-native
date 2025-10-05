@@ -185,13 +185,14 @@ const RootNavigator = () => {
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const user = useSelector((state: RootState) => state.auth.user);
 
-  console.log('=== RootNavigator Debug ===');
-  console.log('isAuthenticated:', isAuthenticated);
-  console.log('user object:', user);
-  console.log('user?.is_first_login:', user?.is_first_login);
-  console.log('typeof user?.is_first_login:', typeof user?.is_first_login);
-  console.log('user?.is_first_login === 1:', user?.is_first_login === 1);
-  console.log('========================');
+  // Debug: Only log when values change to reduce console noise
+  React.useEffect(() => {
+    console.log('🧭 RootNavigator: Auth state changed -', { 
+      isAuthenticated, 
+      userId: user?.id, 
+      isFirstLogin: user?.is_first_login 
+    });
+  }, [isAuthenticated, user?.id, user?.is_first_login]);
 
   return (
     <NavigationContainer>

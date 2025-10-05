@@ -8,6 +8,8 @@ class ApiClient {
   private timeout: number;
   private refreshAttemptCount: number = 0;
   private maxRefreshAttempts: number = 3;
+  private requestCache: Map<string, { promise: Promise<any>; timestamp: number }> = new Map();
+  private readonly CACHE_DURATION = 1000; // 1 second deduplication window
 
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
@@ -26,23 +28,48 @@ class ApiClient {
   private async clearStoredAuth(): Promise<void> {
     try {
       await AsyncStorage.multiRemove(['auth_token', 'auth_user', 'refresh_token', 'token_expires_at', 'refresh_expires_at']);
-      console.log('🧹 Auth data cleared from storage');
+      
     } catch (error) {
       console.error('Error clearing auth data:', error);
     }
+  }
+
+  private generateCacheKey(endpoint: string, method: string, body?: any): string {
+    const bodyStr = body ? JSON.stringify(body) : '';
+    return `${method}:${endpoint}:${bodyStr}`;
+  }
+
+  private getCachedRequest<T>(cacheKey: string): Promise<ApiResponse<T>> | null {
+    const cached = this.requestCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
+      
+      return cached.promise;
+    }
+    return null;
+  }
+
+  private setCachedRequest<T>(cacheKey: string, promise: Promise<ApiResponse<T>>): void {
+    this.requestCache.set(cacheKey, { 
+      promise, 
+      timestamp: Date.now() 
+    });
+    
+    // Clean up old cache entries to prevent memory leaks
+    setTimeout(() => {
+      this.requestCache.delete(cacheKey);
+    }, this.CACHE_DURATION * 2);
   }
 
   private async attemptTokenRefresh(): Promise<{ success: boolean; message: string }> {
     try {
       // Check if we've exceeded maximum refresh attempts
       if (this.refreshAttemptCount >= this.maxRefreshAttempts) {
-        console.log('❌ Maximum token refresh attempts exceeded, forcing logout');
+        
         this.refreshAttemptCount = 0; // Reset counter
         return { success: false, message: 'Maximum refresh attempts exceeded' };
       }
 
       this.refreshAttemptCount++;
-      console.log(`🔄 Attempting token refresh... (attempt ${this.refreshAttemptCount}/${this.maxRefreshAttempts})`);
 
       // Get refresh token directly from storage to avoid circular imports
       const refreshToken = await AsyncStorage.getItem('refresh_token');
@@ -84,16 +111,16 @@ class ApiClient {
           await AsyncStorage.setItem('refresh_expires_at', tokenData.refresh_expires_at);
         }
         
-        console.log('✅ Token refresh successful');
+        
         this.refreshAttemptCount = 0; // Reset counter on success
         return { success: true, message: 'Token refreshed successfully' };
       } else {
-        console.log('❌ Token refresh failed:', refreshResult.message);
+        
         this.refreshAttemptCount = 0; // Reset counter on final failure
         return { success: false, message: refreshResult.message || 'Token refresh failed' };
       }
     } catch (error: any) {
-      console.error('❌ Token refresh error:', error);
+      
       this.refreshAttemptCount = 0; // Reset counter on error
       return { success: false, message: error.message || 'Token refresh failed' };
     }
@@ -118,6 +145,15 @@ class ApiClient {
     } = options;
 
     const url = `${this.baseURL}${endpoint}`;
+    
+    // Check for duplicate requests (only for GET requests to prevent caching side effects)
+    if (method === 'GET') {
+      const cacheKey = this.generateCacheKey(endpoint, method, body);
+      const cachedRequest = this.getCachedRequest<T>(cacheKey);
+      if (cachedRequest) {
+        return cachedRequest;
+      }
+    }
     
     // Default headers
     const requestHeaders: Record<string, string> = {
@@ -392,6 +428,55 @@ class ApiClient {
     });
   }
 
+  async updateTaskStatusWithDocuments(taskId: number, data: {
+    status: string;
+    notes?: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+    };
+    otp?: string;
+    delivery_documents: any[];
+  }) {
+    try {
+      console.log('📄 Preparing multipart form data for task:', taskId);
+      
+      // Create FormData object
+      const formData = new FormData();
+      
+      // Add basic fields
+      formData.append('status', data.status);
+      if (data.notes) formData.append('notes', data.notes);
+      if (data.otp) formData.append('otp', data.otp);
+      if (data.location) {
+        formData.append('latitude', data.location.latitude.toString());
+        formData.append('longitude', data.location.longitude.toString());
+      }
+      
+      // Add delivery documents
+      data.delivery_documents.forEach((doc, index) => {
+        const fileData = {
+          uri: doc.uri,
+          type: doc.type,
+          name: doc.name,
+        };
+        
+        formData.append(`delivery_documents[${index}]`, fileData as any);
+        console.log(`📎 Added document ${index}:`, doc.name);
+      });
+      
+      console.log('📤 Sending multipart request...');
+      
+      return this.makeRequest(`/driver/tasks/${taskId}/status`, {
+        method: 'PUT',
+        body: formData,
+      });
+    } catch (error) {
+      console.error('❌ Error preparing multipart data:', error);
+      throw error;
+    }
+  }
+
   // Profile methods
   async getProfile() {
     return this.makeRequest('/driver/profile');
@@ -500,6 +585,7 @@ class ApiClient {
   }
 
   // Location tracking methods
+  // NOTE: This method is currently bypassed in locationTrackingService.ts for testing
   async sendLocationUpdate(locationData: {
     order_id: string;
     latitude: number;

@@ -4,7 +4,7 @@
  * Automatically starts when order status changes to 'in_transit'
  */
 
-import { Platform, Alert, AppState } from 'react-native';
+import { Platform, AppState } from 'react-native';
 import Geolocation, { GeolocationResponse } from '@react-native-community/geolocation';
 import { check, request, PERMISSIONS, RESULTS, requestMultiple } from 'react-native-permissions';
 import { apiClient } from './apiClient';
@@ -148,11 +148,8 @@ class LocationTrackingService {
       if (!hasPermissions) {
         const granted = await this.requestLocationPermissions();
         if (!granted) {
-          Alert.alert(
-            'Location Permission Required',
-            'Location access is required to track your delivery route. Please enable location permissions in settings.',
-            [{ text: 'OK' }]
-          );
+          console.log('❌ Location permissions not granted');
+          // Alert removed for testing - just log the error
           return false;
         }
       }
@@ -254,7 +251,8 @@ class LocationTrackingService {
     
     switch (error.code) {
       case 1: // PERMISSION_DENIED
-        Alert.alert('Location Access Denied', 'Please enable location permissions to track deliveries.');
+        console.log('❌ Location access denied');
+        // Alert removed for testing - just log the error
         break;
       case 2: // POSITION_UNAVAILABLE
         console.log('⚠️ Location temporarily unavailable');
@@ -365,17 +363,23 @@ class LocationTrackingService {
    */
   private async sendLocationUpdate(locationData: LocationUpdateRequest): Promise<void> {
     try {
-      const response = await apiClient.post('/driver/location-update', locationData);
+      console.log('📍 Location data prepared for sending:', locationData);
+      console.log('🚀 Location update would be sent to: /driver/location-update');
       
-      if (response.success) {
-        console.log('✅ Location update sent successfully');
-      } else {
-        console.error('❌ Failed to send location update:', response.message);
-        throw new Error(response.message);
-      }
+      // API call commented out for testing - keeping console logs
+      // const response = await apiClient.post('/driver/location-update', locationData);
+      
+      // if (response.success) {
+      //   console.log('✅ Location update sent successfully');
+      // } else {
+      //   console.error('❌ Failed to send location update:', response.message);
+      //   throw new Error(response.message);
+      // }
+      
+      console.log('✅ Location logged successfully (API endpoint disabled)');
     } catch (error) {
-      console.error('❌ Error sending location update:', error);
-      throw error;
+      console.error('❌ Error logging location update:', error);
+      // Don't throw error to avoid stopping location tracking during testing
     }
   }
 

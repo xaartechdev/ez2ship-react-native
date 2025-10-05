@@ -9,10 +9,12 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {orderService} from '../services/orderService';
-import { useLocationTracking } from '../hooks/useLocationTracking';
+import { launchImageLibrary, launchCamera, ImagePickerResponse, MediaType, CameraOptions, ImageLibraryOptions } from 'react-native-image-picker';
+import DocumentPicker from '@react-native-documents/picker';
 
 interface Task {
   id: number;
@@ -49,7 +51,6 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
   const {task: initialTask} = route.params;
   const [task, setTask] = useState<Task>(initialTask);
   const [notes, setNotes] = useState('');
-  const { startTracking, stopTracking, getTrackingStatus } = useLocationTracking();
   const [loading, setLoading] = useState(false);
   
   // OTP and Proof of Delivery states
@@ -57,6 +58,11 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [proofUploaded, setProofUploaded] = useState(false);
+  
+  // Document upload states
+  const [deliveryDocuments, setDeliveryDocuments] = useState<any[]>([]);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [showDocumentOptions, setShowDocumentOptions] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -173,9 +179,8 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
           });
           setTask({...task, status: 'in_transit'});
           
-          // Start location tracking for this order
-          console.log('🚀 Order status changed to in_transit, starting location tracking...');
-          await startTracking(task.order_id);
+          // Location tracking will be automatically started by the app-level hook
+          console.log('🚀 Order status changed to in_transit, location tracking will start automatically...');
           break;
         case 'in_progress':
         case 'picked_up':
@@ -189,17 +194,41 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
           break;
         case 'arrived':
         case 'arrived_at_destination':
-          // Complete delivery - send OTP to API for verification
-          await orderService.updateOrderStatus(task.id, {
-            status: 'delivered',
-            notes: notes,
-            otp: otpCode
-          });
-          setTask({...task, status: 'delivered'});
-          
-          // Stop location tracking as delivery is completed
-          console.log('🛑 Order completed, stopping location tracking...');
-          stopTracking();
+          // Validate required documents for delivery
+          // if (deliveryDocuments.length === 0) {
+          //   Alert.alert(
+          //     'Documents Required',
+          //     'Please upload at least one delivery document before marking as delivered.',
+          //     [{ text: 'OK' }]
+          //   );
+          //   return;
+          // }
+
+          // Complete delivery with documents
+          setIsUploadingDoc(true);
+          try {
+            await orderService.updateOrderStatusWithDocuments(task.id, {
+              status: 'delivered',
+              notes: notes,
+              otp: otpCode,
+              delivery_documents: deliveryDocuments
+            });
+            
+            setTask({...task, status: 'delivered'});
+            
+            // Location tracking will be automatically stopped by the app-level hook
+            console.log('🛑 Order completed, location tracking will stop automatically...');
+          } catch (docError) {
+            console.error('❌ Failed to upload documents:', docError);
+            Alert.alert(
+              'Upload Failed', 
+              'Failed to upload delivery documents. Please try again.',
+              [{ text: 'OK' }]
+            );
+            return;
+          } finally {
+            setIsUploadingDoc(false);
+          }
           
           Alert.alert(
             'Delivery Completed',
@@ -245,6 +274,107 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
       {text: 'Damage', onPress: () => console.log('Report damage')},
       {text: 'Other', onPress: () => console.log('Report other issue')},
     ]);
+  };
+
+  // Document Upload Functions
+  const showDocumentPickerOptions = () => {
+    Alert.alert(
+      'Upload Delivery Document',
+      'Choose document source',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Camera', onPress: openCamera },
+        { text: 'Gallery', onPress: openImageLibrary },
+        { text: 'Files', onPress: openDocumentPicker },
+      ]
+    );
+  };
+
+  const openCamera = () => {
+    const options: CameraOptions = {
+      mediaType: 'photo',
+      quality: 0.8,
+      maxWidth: 1000,
+      maxHeight: 1000,
+      includeBase64: false,
+    };
+
+    launchCamera(options, (response: ImagePickerResponse) => {
+      if (response.assets && response.assets.length > 0) {
+        const asset = response.assets[0];
+        addDocument({
+          uri: asset.uri,
+          name: asset.fileName || `delivery_photo_${Date.now()}.jpg`,
+          type: asset.type || 'image/jpeg',
+          size: asset.fileSize || 0,
+        });
+      }
+    });
+  };
+
+  const openImageLibrary = () => {
+    const options: ImageLibraryOptions = {
+      mediaType: 'photo',
+      quality: 0.8,
+      maxWidth: 1000,
+      maxHeight: 1000,
+      includeBase64: false,
+    };
+
+    launchImageLibrary(options, (response: ImagePickerResponse) => {
+      if (response.assets && response.assets.length > 0) {
+        const asset = response.assets[0];
+        addDocument({
+          uri: asset.uri,
+          name: asset.fileName || `delivery_photo_${Date.now()}.jpg`,
+          type: asset.type || 'image/jpeg',
+          size: asset.fileSize || 0,
+        });
+      }
+    });
+  };
+
+  const openDocumentPicker = async () => {
+    try {
+      const result = await DocumentPicker.pick({
+        type: [DocumentPicker.types.pdf, DocumentPicker.types.images, DocumentPicker.types.doc],
+        allowMultiSelection: false,
+      });
+
+      if (result && result.length > 0) {
+        const document = result[0];
+        addDocument({
+          uri: document.uri,
+          name: document.name,
+          type: document.type,
+          size: document.size || 0,
+        });
+      }
+    } catch (error: any) {
+      if (error?.code !== 'DOCUMENT_PICKER_CANCELED') {
+        console.error('Document picker error:', error);
+        Alert.alert('Error', 'Failed to pick document');
+      }
+    }
+  };
+
+  const addDocument = (document: any) => {
+    if (deliveryDocuments.length >= 5) {
+      Alert.alert('Limit Reached', 'You can upload maximum 5 documents');
+      return;
+    }
+
+    const newDocument = {
+      ...document,
+      id: Date.now().toString(),
+    };
+
+    setDeliveryDocuments(prev => [...prev, newDocument]);
+    console.log('📄 Document added:', newDocument.name);
+  };
+
+  const removeDocument = (documentId: string) => {
+    setDeliveryDocuments(prev => prev.filter(doc => doc.id !== documentId));
   };
 
   // OTP and Proof of Delivery functions
@@ -520,6 +650,59 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
               </TouchableOpacity> */}
             </View>
 
+            {/* Document Upload Section */}
+            <View style={styles.documentsSection}>
+              <Text style={styles.documentsSectionTitle}>Delivery Documents *</Text>
+              <Text style={styles.documentsInstructionText}>
+                Upload photos or documents as proof of delivery (Required)
+              </Text>
+              
+              {/* Upload Button */}
+              <TouchableOpacity
+                style={styles.uploadDocumentButton}
+                onPress={showDocumentPickerOptions}
+                disabled={isUploadingDoc}
+              >
+                <Text style={styles.uploadDocumentButtonText}>
+                  📎 Add Document ({deliveryDocuments.length}/5)
+                </Text>
+              </TouchableOpacity>
+              
+              {/* Uploaded Documents List */}
+              {deliveryDocuments.length > 0 && (
+                <View style={styles.documentsListContainer}>
+                  <Text style={styles.documentsListTitle}>Uploaded Documents:</Text>
+                  {deliveryDocuments.map((doc, index) => (
+                    <View key={doc.id} style={styles.documentItem}>
+                      <View style={styles.documentInfo}>
+                        <Text style={styles.documentName} numberOfLines={1}>
+                          📄 {doc.name}
+                        </Text>
+                        <Text style={styles.documentSize}>
+                          {(doc.size / 1024 / 1024).toFixed(2)} MB
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.removeDocumentButton}
+                        onPress={() => removeDocument(doc.id)}
+                      >
+                        <Text style={styles.removeDocumentButtonText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+              
+              {/* Document Requirements */}
+              {deliveryDocuments.length === 0 && (
+                <View style={styles.documentRequirementContainer}>
+                  <Text style={styles.documentRequirementText}>
+                    ⚠️ At least one document is required to complete delivery
+                  </Text>
+                </View>
+              )}
+            </View>
+
             {/* <TouchableOpacity
               style={[
                 styles.verifyOtpButton,
@@ -566,7 +749,7 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
               Upload delivery receipts, photos, or other proof of delivery documents
             </Text>
 
-            {!otpVerified && (
+            {/* {!otpVerified && (
               <TouchableOpacity
                 style={styles.completeDeliveryButtonDisabled}
                 disabled={true}
@@ -575,7 +758,7 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
                   Complete Delivery
                 </Text>
               </TouchableOpacity>
-            )}
+            )} */}
           </View>
         )}
 
@@ -616,9 +799,14 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
           <TouchableOpacity
             style={[styles.actionButton, {backgroundColor: getActionButtonColor()}]}
             onPress={handleActionPress}
-            disabled={loading}>
-            {loading ? (
-              <ActivityIndicator color="white" />
+            disabled={loading || isUploadingDoc}>
+            {(loading || isUploadingDoc) ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator color="white" />
+                <Text style={styles.loadingText}>
+                  {isUploadingDoc ? 'Uploading Documents...' : 'Processing...'}
+                </Text>
+              </View>
             ) : (
               <>
                 <Text style={styles.actionButtonIcon}>{getActionButtonIcon()}</Text>
@@ -1106,6 +1294,109 @@ const styles = StyleSheet.create({
     fontSize: 14,
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+  // Document Upload Styles
+  documentsSection: {
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  documentsSectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  documentsInstructionText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  uploadDocumentButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  uploadDocumentButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  documentsListContainer: {
+    marginTop: 8,
+  },
+  documentsListTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  documentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 6,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  documentInfo: {
+    flex: 1,
+  },
+  documentName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 4,
+  },
+  documentSize: {
+    fontSize: 12,
+    color: '#666',
+  },
+  removeDocumentButton: {
+    backgroundColor: '#dc3545',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
+  },
+  removeDocumentButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  documentRequirementContainer: {
+    backgroundColor: '#fff3cd',
+    padding: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ffeaa7',
+  },
+  documentRequirementText: {
+    fontSize: 14,
+    color: '#856404',
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
   },
 });
 

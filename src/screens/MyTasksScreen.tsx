@@ -61,15 +61,10 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
     return () => clearTimeout(timeoutId);
   }, [searchText, search, dispatch, activeFilter]);
 
-  useEffect(() => {
-    // Load pending tasks by default when component mounts
-    dispatch(resetPagination());
-    dispatch(fetchTasks({ status: 'pending', page: 1 }));
-  }, [dispatch]);
-
-  // Refresh data when screen comes into focus (e.g., returning from OrderDetails)
+  // Load tasks when screen comes into focus (handles both initial load and returning from other screens)
   useFocusEffect(
     React.useCallback(() => {
+      
       dispatch(resetPagination());
       dispatch(fetchTasks({ status: activeFilter, search: search, page: 1 }));
     }, [dispatch, activeFilter, search])
@@ -94,12 +89,10 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
   const handleFilterPress = (
     filter: 'pending' | 'in_progress' | 'completed'
   ) => {
+    // Only update state, let useFocusEffect handle the API call
     setActiveFilter(filter);
     dispatch(setFilter(filter));
-    
-    // Reset pagination and fetch with new filter
-    dispatch(resetPagination());
-    dispatch(fetchTasks({ status: filter, search: search, page: 1 }));
+    // Removed direct fetchTasks call to prevent duplicate with useFocusEffect
   };
 
   const handleSearchChange = (text: string) => {
@@ -117,18 +110,6 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
     const threshold = 100; // Trigger when 100px from bottom
     const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - threshold;
     
-    // Add debug logging
-    console.log('📱 SCROLL DEBUG:', {
-      contentHeight: contentSize.height,
-      scrollY: contentOffset.y,
-      screenHeight: layoutMeasurement.height,
-      distanceFromBottom: contentSize.height - (layoutMeasurement.height + contentOffset.y),
-      isCloseToBottom,
-      hasMore: pagination.has_more,
-      isLoadingMore,
-      isLoading
-    });
-    
     if (isCloseToBottom && pagination.has_more && !isLoadingMore && !isLoading) {
       // Prevent multiple rapid calls with debounce
       const now = Date.now();
@@ -136,7 +117,6 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
         return;
       }
       
-      console.log('🚀 TRIGGERING LOAD MORE - Page:', pagination.current_page + 1);
       setLastLoadMoreTrigger(now);
       const nextPage = pagination.current_page + 1;
       dispatch(fetchTasks({ 

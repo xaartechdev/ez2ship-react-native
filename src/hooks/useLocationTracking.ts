@@ -5,7 +5,6 @@
 
 import { useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
-import { Alert } from 'react-native';
 import { RootState } from '../store';
 import { locationTrackingService } from '../services/locationTrackingService';
 
@@ -13,58 +12,50 @@ export const useLocationTracking = () => {
   const { tasks } = useSelector((state: RootState) => state.tasks);
 
   /**
-   * Check if any task has in_transit status
+   * Check if any task requires location tracking
    */
-  const getInTransitTasks = useCallback(() => {
+  const getTrackingRequiredTasks = useCallback(() => {
     return tasks.filter(task => 
       task.status === 'in_transit' || 
-      task.status === 'picked_up'
+      task.status === 'arrived_at_destination'
     );
   }, [tasks]);
 
   /**
-   * Start tracking for in-transit orders
+   * Start tracking for orders that require location tracking
    */
   const startTrackingIfNeeded = useCallback(async () => {
-    const inTransitTasks = getInTransitTasks();
+    const trackingRequiredTasks = getTrackingRequiredTasks();
     const trackingStatus = locationTrackingService.getTrackingStatus();
 
-    if (inTransitTasks.length > 0 && !trackingStatus.isTracking) {
-      // Start tracking with the first in-transit order
-      const firstTask = inTransitTasks[0];
+    if (trackingRequiredTasks.length > 0 && !trackingStatus.isTracking) {
+      // Start tracking with the first order that requires tracking
+      const firstTask = trackingRequiredTasks[0];
       console.log(`🚀 Auto-starting location tracking for order: ${firstTask.order_id}`);
       
       const started = await locationTrackingService.startTracking(firstTask.order_id);
       
       if (started) {
-        Alert.alert(
-          'Location Tracking Started',
-          `Now tracking your delivery route for order ${firstTask.order_id}`,
-          [{ text: 'OK' }]
-        );
+        console.log(`✅ Location tracking started successfully for order: ${firstTask.order_id}`);
       }
-    } else if (inTransitTasks.length === 0 && trackingStatus.isTracking) {
-      // Stop tracking if no in-transit orders
-      console.log('🛑 Auto-stopping location tracking - no in-transit orders');
+    } else if (trackingRequiredTasks.length === 0 && trackingStatus.isTracking) {
+      // Stop tracking if no orders require location tracking
+      console.log('🛑 Auto-stopping location tracking - no orders requiring tracking');
       locationTrackingService.stopTracking();
       
-      Alert.alert(
-        'Location Tracking Stopped',
-        'Delivery tracking has been stopped as there are no active deliveries.',
-        [{ text: 'OK' }]
-      );
-    } else if (inTransitTasks.length > 0 && trackingStatus.isTracking) {
+      console.log('✅ Location tracking stopped - no orders requiring tracking');
+    } else if (trackingRequiredTasks.length > 0 && trackingStatus.isTracking) {
       // Check if we need to switch to a different order
       const currentlyTrackedOrder = trackingStatus.orderId;
-      const isCurrentOrderStillInTransit = inTransitTasks.some(task => task.order_id === currentlyTrackedOrder);
+      const isCurrentOrderStillRequiringTracking = trackingRequiredTasks.some(task => task.order_id === currentlyTrackedOrder);
       
-      if (!isCurrentOrderStillInTransit && inTransitTasks.length > 0) {
-        console.log(`🔄 Switching tracking to new order: ${inTransitTasks[0].order_id}`);
+      if (!isCurrentOrderStillRequiringTracking && trackingRequiredTasks.length > 0) {
+        console.log(`🔄 Switching tracking to new order: ${trackingRequiredTasks[0].order_id}`);
         locationTrackingService.stopTracking();
-        await locationTrackingService.startTracking(inTransitTasks[0].order_id);
+        await locationTrackingService.startTracking(trackingRequiredTasks[0].order_id);
       }
     }
-  }, [getInTransitTasks]);
+  }, [getTrackingRequiredTasks]);
 
   /**
    * Handle manual start tracking
@@ -75,17 +66,9 @@ export const useLocationTracking = () => {
     const started = await locationTrackingService.startTracking(orderId);
     
     if (started) {
-      Alert.alert(
-        'Location Tracking Started',
-        `Now tracking your delivery route for order ${orderId}`,
-        [{ text: 'OK' }]
-      );
+      console.log(`✅ Manual location tracking started for order: ${orderId}`);
     } else {
-      Alert.alert(
-        'Failed to Start Tracking',
-        'Could not start location tracking. Please check your location permissions.',
-        [{ text: 'OK' }]
-      );
+      console.log('❌ Failed to start location tracking - check permissions');
     }
     
     return started;
@@ -98,11 +81,7 @@ export const useLocationTracking = () => {
     console.log('🛑 Manually stopping location tracking');
     locationTrackingService.stopTracking();
     
-    Alert.alert(
-      'Location Tracking Stopped',
-      'Delivery tracking has been stopped.',
-      [{ text: 'OK' }]
-    );
+    console.log('✅ Location tracking stopped successfully');
   }, []);
 
   /**
@@ -145,7 +124,7 @@ export const useLocationTracking = () => {
     forceLocationUpdate,
     checkLocationPermissions,
     requestLocationPermissions,
-    inTransitTasks: getInTransitTasks(),
+    trackingRequiredTasks: getTrackingRequiredTasks(),
   };
 };
 
