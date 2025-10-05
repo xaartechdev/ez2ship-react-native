@@ -6,6 +6,8 @@ import { forceLogoutAsync } from '../store/slices/authSlice';
 class ApiClient {
   private baseURL: string;
   private timeout: number;
+  private refreshAttemptCount: number = 0;
+  private maxRefreshAttempts: number = 3;
 
   constructor() {
     this.baseURL = API_CONFIG.BASE_URL;
@@ -32,11 +34,22 @@ class ApiClient {
 
   private async attemptTokenRefresh(): Promise<{ success: boolean; message: string }> {
     try {
+      // Check if we've exceeded maximum refresh attempts
+      if (this.refreshAttemptCount >= this.maxRefreshAttempts) {
+        console.log('❌ Maximum token refresh attempts exceeded, forcing logout');
+        this.refreshAttemptCount = 0; // Reset counter
+        return { success: false, message: 'Maximum refresh attempts exceeded' };
+      }
+
+      this.refreshAttemptCount++;
+      console.log(`🔄 Attempting token refresh... (attempt ${this.refreshAttemptCount}/${this.maxRefreshAttempts})`);
+
       // Get refresh token directly from storage to avoid circular imports
       const refreshToken = await AsyncStorage.getItem('refresh_token');
       const refreshExpiryString = await AsyncStorage.getItem('refresh_expires_at');
       
       if (!refreshToken) {
+        this.refreshAttemptCount = 0; // Reset counter
         return { success: false, message: 'No refresh token available' };
       }
 
@@ -45,11 +58,11 @@ class ApiClient {
         const expiryDate = new Date(refreshExpiryString);
         const now = new Date();
         if (expiryDate <= now) {
+          this.refreshAttemptCount = 0; // Reset counter
           return { success: false, message: 'Refresh token expired' };
         }
       }
       
-      console.log('🔄 Attempting token refresh...');
       const refreshResult = await this.refreshToken(refreshToken);
       
       if (refreshResult.success && refreshResult.data) {
@@ -72,13 +85,16 @@ class ApiClient {
         }
         
         console.log('✅ Token refresh successful');
+        this.refreshAttemptCount = 0; // Reset counter on success
         return { success: true, message: 'Token refreshed successfully' };
       } else {
         console.log('❌ Token refresh failed:', refreshResult.message);
+        this.refreshAttemptCount = 0; // Reset counter on final failure
         return { success: false, message: refreshResult.message || 'Token refresh failed' };
       }
     } catch (error: any) {
       console.error('❌ Token refresh error:', error);
+      this.refreshAttemptCount = 0; // Reset counter on error
       return { success: false, message: error.message || 'Token refresh failed' };
     }
   }
@@ -90,13 +106,15 @@ class ApiClient {
       body?: any;
       headers?: Record<string, string>;
       requireAuth?: boolean;
+      isRefreshRequest?: boolean;
     } = {}
   ): Promise<ApiResponse<T>> {
     const {
       method = 'GET',
       body,
       headers = {},
-      requireAuth = true
+      requireAuth = true,
+      isRefreshRequest = false
     } = options;
 
     const url = `${this.baseURL}${endpoint}`;
@@ -166,7 +184,9 @@ class ApiClient {
       });
 
       // Check for invalid token response and attempt refresh
-      if (typeof responseData === 'object' && responseData && 
+      // Skip token refresh logic for refresh token requests to prevent infinite loop
+      if (!isRefreshRequest && 
+          typeof responseData === 'object' && responseData && 
           responseData.success === false && 
           (responseData.error_code === 'INVALID_TOKEN' || 
            responseData.message === 'Invalid or expired token' ||
@@ -287,6 +307,7 @@ class ApiClient {
         device_name: deviceName 
       },
       requireAuth: false, // Don't require auth for refresh token endpoint
+      isRefreshRequest: true, // Flag to prevent token validation loop
     });
   }
 
