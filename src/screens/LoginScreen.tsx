@@ -84,7 +84,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     }
 
     try {
-      console.log('📡 Starting login dispatch...');
       // Add timeout protection to prevent ANR
       const loginPromise = dispatch(login({
         email: email.trim().toLowerCase(),
