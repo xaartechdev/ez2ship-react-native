@@ -206,7 +206,24 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
 
           // Complete delivery with documents
           setIsUploadingDoc(true);
+          console.log('🚚 MARK DELIVERED - Starting document upload process');
+          console.log('📋 Order Details:', { 
+            taskId: task.id, 
+            status: 'delivered', 
+            notes: notes, 
+            otpCode: otpCode,
+            documentsCount: deliveryDocuments.length 
+          });
+          console.log('📄 Documents to upload:', deliveryDocuments.map((doc, index) => ({
+            index,
+            name: doc.name,
+            type: doc.type,
+            uri: doc.uri ? doc.uri.substring(0, 50) + '...' : 'No URI',
+            size: doc.size || 'Unknown size'
+          })));
+          
           try {
+            console.log('🔄 Calling orderService.updateOrderStatusWithDocuments...');
             await orderService.updateOrderStatusWithDocuments(task.id, {
               status: 'delivered',
               notes: notes,
@@ -214,6 +231,7 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
               delivery_documents: deliveryDocuments
             });
             
+            console.log('✅ Document upload completed successfully');
             setTask({...task, status: 'delivered'});
             
             // Location tracking will be automatically stopped by the app-level hook
@@ -300,14 +318,31 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
     };
 
     launchCamera(options, (response: ImagePickerResponse) => {
+      console.log('📷 CAMERA - Response received:', {
+        didCancel: response.didCancel,
+        errorMessage: response.errorMessage,
+        assetsCount: response.assets?.length || 0
+      });
+      
       if (response.assets && response.assets.length > 0) {
         const asset = response.assets[0];
+        console.log('📷 CAMERA - Asset details:', {
+          uri: asset.uri ? `${asset.uri.substring(0, 50)}...` : 'No URI',
+          fileName: asset.fileName,
+          type: asset.type,
+          fileSize: asset.fileSize,
+          width: asset.width,
+          height: asset.height
+        });
+        
         addDocument({
           uri: asset.uri,
           name: asset.fileName || `delivery_photo_${Date.now()}.jpg`,
           type: asset.type || 'image/jpeg',
           size: asset.fileSize || 0,
         });
+      } else {
+        console.log('⚠️ CAMERA - No assets in response or cancelled');
       }
     });
   };
@@ -322,45 +357,94 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
     };
 
     launchImageLibrary(options, (response: ImagePickerResponse) => {
+      console.log('🖼️ IMAGE LIBRARY - Response received:', {
+        didCancel: response.didCancel,
+        errorMessage: response.errorMessage,
+        assetsCount: response.assets?.length || 0
+      });
+      
       if (response.assets && response.assets.length > 0) {
         const asset = response.assets[0];
+        console.log('🖼️ IMAGE LIBRARY - Asset details:', {
+          uri: asset.uri ? `${asset.uri.substring(0, 50)}...` : 'No URI',
+          fileName: asset.fileName,
+          type: asset.type,
+          fileSize: asset.fileSize,
+          width: asset.width,
+          height: asset.height
+        });
+        
         addDocument({
           uri: asset.uri,
           name: asset.fileName || `delivery_photo_${Date.now()}.jpg`,
           type: asset.type || 'image/jpeg',
           size: asset.fileSize || 0,
         });
+      } else {
+        console.log('⚠️ IMAGE LIBRARY - No assets in response or cancelled');
       }
     });
   };
 
   const openDocumentPicker = async () => {
     try {
+      console.log('📁 DOCUMENT PICKER - Opening...');
       const result = await DocumentPicker.pick({
         type: [DocumentPicker.types.pdf, DocumentPicker.types.images, DocumentPicker.types.doc],
         allowMultiSelection: false,
       });
 
+      console.log('📁 DOCUMENT PICKER - Result received:', {
+        resultLength: result?.length || 0,
+        result: result
+      });
+
       if (result && result.length > 0) {
         const document = result[0];
+        console.log('📁 DOCUMENT PICKER - Document details:', {
+          uri: document.uri ? `${document.uri.substring(0, 50)}...` : 'No URI',
+          name: document.name,
+          type: document.type,
+          size: document.size,
+          fullDocument: document
+        });
+        
         addDocument({
           uri: document.uri,
           name: document.name,
           type: document.type,
           size: document.size || 0,
         });
+      } else {
+        console.log('⚠️ DOCUMENT PICKER - No documents selected');
       }
     } catch (error: any) {
+      console.log('📁 DOCUMENT PICKER - Error or cancellation:', {
+        code: error?.code,
+        message: error?.message,
+        wasCancelled: error?.code === 'DOCUMENT_PICKER_CANCELED'
+      });
+      
       if (error?.code !== 'DOCUMENT_PICKER_CANCELED') {
-        console.error('Document picker error:', error);
+        console.error('📁 DOCUMENT PICKER - Actual error:', error);
         Alert.alert('Error', 'Failed to pick document');
       }
     }
   };
 
   const addDocument = (document: any) => {
+    console.log('📄 ADD DOCUMENT - Function called with:', document);
+    
     if (deliveryDocuments.length >= 5) {
       Alert.alert('Limit Reached', 'You can upload maximum 5 documents');
+      console.log('⚠️ Document limit reached (5), not adding document');
+      return;
+    }
+
+    // Validate document structure before adding
+    if (!document.uri) {
+      console.error('❌ Document missing URI - cannot add');
+      Alert.alert('Error', 'Selected document is invalid (missing URI)');
       return;
     }
 
@@ -368,9 +452,39 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
       ...document,
       id: Date.now().toString(),
     };
+    
+    console.log('📄 Creating new document object:', {
+      id: newDocument.id,
+      name: newDocument.name,
+      type: newDocument.type,
+      uri: newDocument.uri ? `${newDocument.uri.substring(0, 50)}...` : 'No URI',
+      size: newDocument.size,
+      uriFormat: newDocument.uri?.startsWith('file://') ? 'file://' : 
+                newDocument.uri?.startsWith('content://') ? 'content://' : 
+                newDocument.uri?.startsWith('http') ? 'http/https' : 'unknown'
+    });
+    
+    // Additional validation for multipart upload compatibility
+    console.log('🔍 Document validation for multipart upload:', {
+      hasValidUri: !!newDocument.uri && newDocument.uri.length > 0,
+      hasValidName: !!newDocument.name && newDocument.name.length > 0,
+      hasValidType: !!newDocument.type && newDocument.type.length > 0,
+      readyForUpload: !!(newDocument.uri && newDocument.name && newDocument.type)
+    });
 
-    setDeliveryDocuments(prev => [...prev, newDocument]);
-    console.log('📄 Document added:', newDocument.name);
+    setDeliveryDocuments(prev => {
+      const updated = [...prev, newDocument];
+      console.log('📄 Updated deliveryDocuments array length:', updated.length);
+      console.log('📄 All documents in array:', updated.map((doc, index) => ({
+        index,
+        id: doc.id,
+        name: doc.name,
+        type: doc.type
+      })));
+      return updated;
+    });
+    
+    console.log('✅ Document successfully added to deliveryDocuments state');
   };
 
   const removeDocument = (documentId: string) => {

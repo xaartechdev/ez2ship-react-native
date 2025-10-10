@@ -179,9 +179,31 @@ class ApiClient {
     if (body && method !== 'GET') {
       if (body instanceof FormData) {
         // For file uploads, remove Content-Type to let browser set boundary
+        console.log('📋 MAKE REQUEST - Detected FormData body, removing Content-Type header');
         delete requestHeaders['Content-Type'];
         requestConfig.body = body;
+        
+        // Log FormData entries (for debugging)
+        console.log('📋 MAKE REQUEST - FormData entries:');
+        try {
+          // Note: FormData.entries() might not be available in all React Native versions
+          // This is just for debugging purposes
+          if (body.entries) {
+            let entryCount = 0;
+            for (const [key, value] of body.entries()) {
+              entryCount++;
+              console.log(`  Entry ${entryCount}: ${key} = ${typeof value === 'object' ? 'File object' : value}`);
+            }
+            console.log(`📋 Total FormData entries: ${entryCount}`);
+          } else {
+            console.log('  FormData.entries() not available - cannot enumerate entries');
+          }
+        } catch (e) {
+          console.log('  Unable to enumerate FormData entries (this is normal in React Native)');
+        }
+        
       } else {
+        console.log('📋 MAKE REQUEST - JSON body detected');
         requestConfig.body = JSON.stringify(body);
       }
     }
@@ -439,40 +461,141 @@ class ApiClient {
     delivery_documents: any[];
   }) {
     try {
+      console.log('� API CLIENT - updateTaskStatusWithDocuments called');
+      console.log('📄 Task ID:', taskId);
+      console.log('�📄 Request data received:', {
+        status: data.status,
+        notes: data.notes,
+        otp: data.otp,
+        hasLocation: !!data.location,
+        documentsCount: data.delivery_documents?.length || 0
+      });
+      
       console.log('📄 Preparing multipart form data for task:', taskId);
       
       // Create FormData object
       const formData = new FormData();
       
       // Add basic fields
+      console.log('📝 Adding basic form fields...');
       formData.append('status', data.status);
-      if (data.notes) formData.append('notes', data.notes);
-      if (data.otp) formData.append('otp', data.otp);
+      console.log('  ✓ status:', data.status);
+      
+      if (data.notes) {
+        formData.append('notes', data.notes);
+        console.log('  ✓ notes:', data.notes);
+      }
+      
+      if (data.otp) {
+        formData.append('otp', data.otp);
+        console.log('  ✓ otp:', data.otp);
+      }
+      
       if (data.location) {
         formData.append('latitude', data.location.latitude.toString());
         formData.append('longitude', data.location.longitude.toString());
+        console.log('  ✓ location:', data.location);
       }
       
       // Add delivery documents
-      data.delivery_documents.forEach((doc, index) => {
-        const fileData = {
-          uri: doc.uri,
-          type: doc.type,
-          name: doc.name,
-        };
-        
-        formData.append(`delivery_documents[${index}]`, fileData as any);
-        console.log(`📎 Added document ${index}:`, doc.name);
-      });
+      console.log('📎 Processing delivery documents...');
+      console.log('📎 Documents array:', data.delivery_documents);
+      
+      if (!data.delivery_documents || data.delivery_documents.length === 0) {
+        console.log('⚠️ WARNING: No delivery documents provided!');
+      } else {
+        console.log(`📎 Processing ${data.delivery_documents.length} documents for multipart upload`);
+        data.delivery_documents.forEach((doc, index) => {
+          console.log(`📄 Processing document ${index}:`, {
+            name: doc.name,
+            type: doc.type,
+            uri: doc.uri ? `${doc.uri.substring(0, 50)}...` : 'No URI',
+            hasSize: !!doc.size,
+            fullDoc: doc
+          });
+          
+          // Validate required fields for multipart upload
+          if (!doc.uri) {
+            console.error(`❌ Document ${index} missing URI - this will cause upload failure!`);
+            return;
+          }
+          
+          if (!doc.name) {
+            console.warn(`⚠️ Document ${index} missing name - using fallback`);
+          }
+          
+          if (!doc.type) {
+            console.warn(`⚠️ Document ${index} missing type - using fallback`);
+          }
+          
+          // React Native FormData requires specific file object structure
+          const fileData = {
+            uri: doc.uri,
+            type: doc.type || 'application/octet-stream',
+            name: doc.name || `document_${index}_${Date.now()}`,
+          } as any;
+          
+          console.log(`📎 Creating React Native file object for document ${index}:`, fileData);
+          console.log(`📎 File data validation:`, {
+            uriValid: !!fileData.uri && fileData.uri.length > 0,
+            typeValid: !!fileData.type && fileData.type.length > 0,
+            nameValid: !!fileData.name && fileData.name.length > 0,
+            uriFormat: fileData.uri?.startsWith('file://') ? 'file://' : 
+                      fileData.uri?.startsWith('content://') ? 'content://' : 
+                      fileData.uri?.startsWith('http') ? 'http/https' : 'unknown'
+          });
+          
+          // For React Native, append the file object directly
+          formData.append(`delivery_documents[${index}]`, fileData);
+          console.log(`✅ Added document ${index} to FormData with key: delivery_documents[${index}]`);
+          
+          // Additional logging to verify FormData content
+          console.log(`🔍 Verifying FormData entry ${index}:`, {
+            key: `delivery_documents[${index}]`,
+            hasUri: !!fileData.uri,
+            hasType: !!fileData.type,
+            hasName: !!fileData.name,
+            isFileObject: typeof fileData === 'object' && fileData.uri
+          });
+        });
+      }
+      
+      console.log('📋 FormData preparation complete');
+      console.log('📋 MULTIPART UPLOAD SUMMARY:');
+      console.log('  📍 Endpoint:', `/driver/tasks/${taskId}/status`);
+      console.log('  📍 Method: PUT');
+      console.log('  📍 Content-Type: multipart/form-data (auto-set)');
+      console.log('  📍 Form Fields:');
+      console.log('    - status:', data.status);
+      if (data.notes) console.log('    - notes:', data.notes);
+      if (data.otp) console.log('    - otp:', data.otp);
+      if (data.location) console.log('    - location: lat/lng provided');
+      console.log('  📍 File Fields:');
+      if (data.delivery_documents && data.delivery_documents.length > 0) {
+        data.delivery_documents.forEach((doc, index) => {
+          console.log(`    - delivery_documents[${index}]: ${doc.name} (${doc.type})`);
+        });
+      } else {
+        console.log('    - No file fields');
+      }
       
       console.log('📤 Sending multipart request...');
       
-      return this.makeRequest(`/driver/tasks/${taskId}/status`, {
+      const response = await this.makeRequest(`/driver/tasks/${taskId}/status`, {
         method: 'PUT',
         body: formData,
       });
+      
+      console.log('📨 API CLIENT - Response received:', response);
+      return response;
+      
     } catch (error) {
-      console.error('❌ Error preparing multipart data:', error);
+      console.error('❌ API CLIENT ERROR in updateTaskStatusWithDocuments:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       throw error;
     }
   }

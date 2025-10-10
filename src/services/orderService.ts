@@ -110,16 +110,42 @@ class OrderService {
    */
   async updateOrderStatusWithDocuments(taskId: number, updateData: UpdateStatusRequest & { delivery_documents: any[] }): Promise<void> {
     try {
-      console.log('📄 Updating order status with documents:', { taskId, updateData });
+      console.log('🔧 ORDER SERVICE - updateOrderStatusWithDocuments called');
+      console.log('📄 Task ID:', taskId);
+      console.log('📄 Update Data:', JSON.stringify(updateData, null, 2));
+      console.log('📄 Documents array length:', updateData.delivery_documents?.length || 0);
       
+      if (updateData.delivery_documents?.length > 0) {
+        console.log('📎 Individual Documents:');
+        updateData.delivery_documents.forEach((doc, index) => {
+          console.log(`  Document ${index}:`, {
+            name: doc.name,
+            type: doc.type,
+            uri: doc.uri ? `${doc.uri.substring(0, 50)}...` : 'No URI',
+            hasSize: !!doc.size
+          });
+        });
+      } else {
+        console.log('⚠️ WARNING: No documents in delivery_documents array!');
+      }
+      
+      console.log('🚀 Calling apiClient.updateTaskStatusWithDocuments...');
       const response = await apiClient.updateTaskStatusWithDocuments(taskId, updateData);
-      console.log('📄 Document upload response:', response);
+      console.log('📨 API Response received:', response);
       
       if (!response.success) {
+        console.error('❌ API Response indicates failure:', response.message);
         throw new Error(response.message || 'Failed to update order status with documents');
       }
+      
+      console.log('✅ ORDER SERVICE - Document upload completed successfully');
     } catch (error: any) {
-      console.error('❌ Error updating order status with documents:', error);
+      console.error('❌ ORDER SERVICE ERROR:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       throw new Error(error.message || 'Failed to update order status with documents');
     }
   }
