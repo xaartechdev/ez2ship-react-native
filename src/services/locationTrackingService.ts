@@ -5,8 +5,24 @@
  */
 
 import { Platform, AppState } from 'react-native';
-import Geolocation, { GeolocationResponse } from '@react-native-community/geolocation';
-import { check, request, PERMISSIONS, RESULTS, requestMultiple } from 'react-native-permissions';
+import Geolocation from './geolocationSafe';
+
+// Local Geolocation types (react-native-geolocation-service may not export TS types)
+interface GeolocationCoords {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  speed?: number | null;
+  heading?: number | null;
+  altitude?: number | null;
+}
+
+interface GeolocationResponse {
+  coords: GeolocationCoords;
+  timestamp: number;
+}
+
+import { check, request, PERMISSIONS, RESULTS, requestMultiple } from './permissionsSafe';
 import { apiClient } from './apiClient';
 
 export interface LocationData {

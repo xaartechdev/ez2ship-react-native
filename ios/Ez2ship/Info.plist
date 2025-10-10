@@ -31,29 +31,24 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string/>
-	
-	<!-- Permissions for document upload -->
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs access to camera to capture documents for delivery proof</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app needs access to photo library to select documents for delivery proof</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>This app needs access to save captured documents to photo library</string>
 	<key>NSDocumentsFolderUsageDescription</key>
 	<string>This app needs access to documents folder to upload delivery documents</string>
 	<key>NSFileSystemAccessUsageDescription</key>
 	<string>This app needs file system access to manage delivery documents</string>
-	
-	<!-- Location permissions for delivery tracking -->
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs location access to track deliveries and provide real-time updates to customers</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>This app needs location access to track deliveries in the background and provide real-time updates to customers</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>This app needs location access to track deliveries in the background and provide real-time updates to customers</string>
-	
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs location access to track deliveries and provide real-time updates to customers</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>This app needs access to save captured documents to photo library</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to photo library to select documents for delivery proof</string>
+	<key>RCTNewArchEnabled</key>
+	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen
 LaunchScreen
