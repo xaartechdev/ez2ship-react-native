@@ -31,6 +31,22 @@ target 'Ez2ship' do
       config[:reactNativePath],
       :mac_catalyst_enabled => false,
     )
+    # Ensure Hermes engine/frameworks are built with dSYM generation enabled so archives include DWARF files
+    begin
+      installer.pods_project.targets.each do |target|
+        if target.name =~ /hermes/i
+          target.build_configurations.each do |build_config|
+            # Force DWARF with dSYM for Release and other configs
+            build_config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'
+            build_config.build_settings['GCC_GENERATE_DEBUGGING_SYMBOLS'] = 'YES'
+            # Avoid stripping symbols too early
+            build_config.build_settings['STRIP_INSTALLED_PRODUCT'] = 'NO'
+          end
+        end
+      end
+    rescue => e
+      Pod::UI.puts "Warning: couldn't ensure Hermes dSYM settings: #{e.message}".yellow
+    end
   end
 end
 
