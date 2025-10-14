@@ -114,8 +114,19 @@ export const useLocationTracking = () => {
 
   // Auto-start/stop tracking based on task status changes
   useEffect(() => {
+    console.log('🔄 useLocationTracking: Tasks updated, checking tracking requirements...');
+    const trackingTasks = getTrackingRequiredTasks();
+    const currentStatus = locationTrackingService.getTrackingStatus();
+    
+    console.log('📊 Tracking Status Summary:', {
+      tasksRequiringTracking: trackingTasks.length,
+      taskIds: trackingTasks.map(t => t.order_id),
+      currentlyTracking: currentStatus.isTracking,
+      currentOrderId: currentStatus.orderId
+    });
+    
     startTrackingIfNeeded();
-  }, [startTrackingIfNeeded, tasks]);
+  }, [startTrackingIfNeeded, tasks, getTrackingRequiredTasks]);
 
   return {
     startTracking,

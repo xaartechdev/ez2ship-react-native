@@ -4,7 +4,7 @@
  * Automatically starts when order status changes to 'in_transit'
  */
 
-import { Platform, AppState } from 'react-native';
+import { Platform, AppState, Alert } from 'react-native';
 import Geolocation from './geolocationSafe';
 
 // Local Geolocation types (react-native-geolocation-service may not export TS types)
@@ -160,12 +160,38 @@ class LocationTrackingService {
       }
 
       // Check permissions first
+      console.log('🔍 Checking location permissions...');
       const hasPermissions = await this.hasLocationPermissions();
+      console.log('📍 Current permissions status:', hasPermissions);
+      
       if (!hasPermissions) {
+        console.log('⚠️ Location permissions not granted, requesting...');
         const granted = await this.requestLocationPermissions();
+        console.log('📍 Permission request result:', granted);
+        
         if (!granted) {
-          console.log('❌ Location permissions not granted');
-          // Alert removed for testing - just log the error
+          console.log('❌ Location permissions not granted - cannot start tracking');
+          console.log('💡 SOLUTION: Go to device Settings > Apps > Ez2ship > Permissions > Location > Allow');
+          
+          Alert.alert(
+            'Location Permission Required',
+            'Ez2ship needs location access to track deliveries. Please grant location permission in your device settings.\n\nSettings > Apps > Ez2ship > Permissions > Location > Allow',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { 
+                text: 'Open Settings', 
+                onPress: () => {
+                  // Open device settings (requires react-native-permissions linking)
+                  try {
+                    const { openSettings } = require('react-native-permissions');
+                    openSettings();
+                  } catch (error) {
+                    console.log('Cannot open settings automatically - user must do it manually');
+                  }
+                }
+              }
+            ]
+          );
           return false;
         }
       }
@@ -335,7 +361,21 @@ class LocationTrackingService {
    */
   private startPeriodicUpdates(): void {
     this.updateInterval = setInterval(() => {
-      this.flushLocationBuffer();
+      if (this.locationBuffer.length > 0) {
+        console.log(`📊 Sending ${this.locationBuffer.length} buffered location updates`);
+        this.flushLocationBuffer();
+      } else {
+        console.log('📊 Location tracking active - no new locations to send');
+      }
+      
+      // Log current tracking status for monitoring
+      console.log('🔄 BACKGROUND TRACKING STATUS:', {
+        isTracking: this.isTracking,
+        orderId: this.currentOrderId,
+        bufferSize: this.locationBuffer.length,
+        hasLastLocation: !!this.lastKnownLocation,
+        watchId: this.watchId !== null
+      });
     }, this.updateIntervalMs);
   }
 
@@ -380,22 +420,22 @@ class LocationTrackingService {
   private async sendLocationUpdate(locationData: LocationUpdateRequest): Promise<void> {
     try {
       console.log('📍 Location data prepared for sending:', locationData);
-      console.log('🚀 Location update would be sent to: /driver/location-update');
+      console.log('🚀 Sending location update to: /driver/location-update');
       
-      // API call commented out for testing - keeping console logs
-      // const response = await apiClient.post('/driver/location-update', locationData);
+      // Send location update to API
+      const response = await apiClient.post('/driver/location-update', locationData);
       
-      // if (response.success) {
-      //   console.log('✅ Location update sent successfully');
-      // } else {
-      //   console.error('❌ Failed to send location update:', response.message);
-      //   throw new Error(response.message);
-      // }
+      if (response.success) {
+        console.log('✅ Location update sent successfully');
+      } else {
+        console.error('❌ Failed to send location update:', response.message);
+        throw new Error(response.message);
+      }
       
-      console.log('✅ Location logged successfully (API endpoint disabled)');
     } catch (error) {
-      console.error('❌ Error logging location update:', error);
+      console.error('❌ Error sending location update:', error);
       // Don't throw error to avoid stopping location tracking during testing
+      // Just log the error and continue tracking
     }
   }
 

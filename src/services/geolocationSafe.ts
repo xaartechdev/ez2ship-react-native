@@ -27,47 +27,59 @@ const hasNavigatorGeolocation = typeof (globalThis as any).navigator !== 'undefi
 
 export default {
   watchPosition(success: SuccessCallback, error?: ErrorCallback, options?: any): number | null {
-    if (NativeGeo && typeof NativeGeo.watchPosition === 'function') {
-      return NativeGeo.watchPosition(success, error, options);
-    }
-
+    console.log('🔍 Geolocation: Attempting to start location tracking...');
+    
+    // Try built-in navigator geolocation first (more reliable fallback)
     if (hasNavigatorGeolocation) {
       try {
-        // navigator returns watchId number
-  return (globalThis as any).navigator.geolocation.watchPosition(success, error, options);
+        console.log('🌐 Using built-in navigator.geolocation');
+        return (globalThis as any).navigator.geolocation.watchPosition(success, error, options);
       } catch (e) {
         console.warn('geolocationSafe: navigator.geolocation.watchPosition failed', e);
-        return null;
       }
     }
 
+    // Fallback to native module
+    if (NativeGeo && typeof NativeGeo.watchPosition === 'function') {
+      console.log('📱 Using native react-native-geolocation-service');
+      return NativeGeo.watchPosition(success, error, options);
+    }
+
     console.warn('geolocationSafe: No geolocation implementation available (native module missing)');
+    console.log('💡 SOLUTION: Try rebuilding the app or check GEOLOCATION_FIX_GUIDE.md');
     if (error) {
-      error({ code: 1, message: 'Geolocation not available' });
+      error({ code: 1, message: 'Geolocation not available - check app permissions and rebuild' });
     }
     return null;
   },
 
   getCurrentPosition(success: SuccessCallback, error?: ErrorCallback, options?: any): void {
-    if (NativeGeo && typeof NativeGeo.getCurrentPosition === 'function') {
-      return NativeGeo.getCurrentPosition(success, error, options);
-    }
-
+    console.log('📍 Geolocation: Getting current position...');
+    
+    // Try built-in navigator geolocation first (more reliable fallback)
     if (hasNavigatorGeolocation) {
       try {
-  return (globalThis as any).navigator.geolocation.getCurrentPosition(success, error, options);
+        console.log('🌐 Using built-in navigator.geolocation for current position');
+        (globalThis as any).navigator.geolocation.getCurrentPosition(success, error, options);
+        return;
       } catch (e) {
         console.warn('geolocationSafe: navigator.geolocation.getCurrentPosition failed', e);
-        if (error) error(e);
-        return;
       }
     }
 
-    console.warn('geolocationSafe: No geolocation implementation available (native module missing)');
-    if (error) error({ code: 1, message: 'Geolocation not available' });
-  },
+    // Fallback to native module
+    if (NativeGeo && typeof NativeGeo.getCurrentPosition === 'function') {
+      console.log('📱 Using native react-native-geolocation-service for current position');
+      NativeGeo.getCurrentPosition(success, error, options);
+      return;
+    }
 
-  clearWatch(watchId: number | null): void {
+    console.warn('geolocationSafe: No geolocation implementation available');
+    console.log('💡 SOLUTION: Try rebuilding the app or check GEOLOCATION_FIX_GUIDE.md');
+    if (error) {
+      error({ code: 1, message: 'Geolocation not available - check app permissions and rebuild' });
+    }
+  },  clearWatch(watchId: number | null): void {
     if (NativeGeo && typeof NativeGeo.clearWatch === 'function') {
       try {
         if (watchId !== null) NativeGeo.clearWatch(watchId);
