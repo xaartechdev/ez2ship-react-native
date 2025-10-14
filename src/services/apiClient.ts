@@ -461,9 +461,9 @@ class ApiClient {
     delivery_documents: any[];
   }) {
     try {
-      console.log('� API CLIENT - updateTaskStatusWithDocuments called');
+      console.log('📱 API CLIENT - updateTaskStatusWithDocuments called');
       console.log('📄 Task ID:', taskId);
-      console.log('�📄 Request data received:', {
+      console.log('📄 Request data received:', {
         status: data.status,
         notes: data.notes,
         otp: data.otp,
@@ -471,30 +471,31 @@ class ApiClient {
         documentsCount: data.delivery_documents?.length || 0
       });
       
-      console.log('📄 Preparing multipart form data for task:', taskId);
+      console.log('📄 Preparing React Native compatible FormData for task:', taskId);
       
-      // Create FormData object
-      const formData = new FormData();
+      // Create FormData object - React Native version
+      const formData = new FormData() as any;
       
-      // Add basic fields
-      console.log('📝 Adding basic form fields...');
+      // Add basic fields with explicit string conversion
+      console.log('📝 Adding basic form fields (React Native FormData)...');
       formData.append('status', data.status);
-      console.log('  ✓ status:', data.status);
+      console.log('  ✓ status:', data.status, typeof data.status);
       
       if (data.notes) {
         formData.append('notes', data.notes);
-        console.log('  ✓ notes:', data.notes);
+        console.log('  ✓ notes:', data.notes, typeof data.notes);
       }
       
       if (data.otp) {
         formData.append('otp', data.otp);
-        console.log('  ✓ otp:', data.otp);
+        console.log('  ✓ otp:', data.otp, typeof data.otp);
       }
       
       if (data.location) {
         formData.append('latitude', data.location.latitude.toString());
         formData.append('longitude', data.location.longitude.toString());
-        console.log('  ✓ location:', data.location);
+        console.log('  ✓ location latitude:', data.location.latitude, typeof data.location.latitude.toString());
+        console.log('  ✓ location longitude:', data.location.longitude, typeof data.location.longitude.toString());
       }
       
       // Add delivery documents
@@ -564,29 +565,122 @@ class ApiClient {
       console.log('📋 MULTIPART UPLOAD SUMMARY:');
       console.log('  📍 Endpoint:', `/driver/tasks/${taskId}/status`);
       console.log('  📍 Method: PUT');
-      console.log('  📍 Content-Type: multipart/form-data (auto-set)');
+      console.log('  📍 Content-Type: multipart/form-data (auto-set by browser)');
+      console.log('  📍 Request URL:', `${this.baseURL}/driver/tasks/${taskId}/status`);
       console.log('  📍 Form Fields:');
       console.log('    - status:', data.status);
       if (data.notes) console.log('    - notes:', data.notes);
       if (data.otp) console.log('    - otp:', data.otp);
       if (data.location) console.log('    - location: lat/lng provided');
-      console.log('  📍 File Fields:');
+      console.log('  📍 File Fields (delivery_documents):');
       if (data.delivery_documents && data.delivery_documents.length > 0) {
         data.delivery_documents.forEach((doc, index) => {
           console.log(`    - delivery_documents[${index}]: ${doc.name} (${doc.type})`);
+          console.log(`      URI: ${doc.uri?.substring(0, 60)}...`);
         });
       } else {
-        console.log('    - No file fields');
+        console.log('    - No file fields - THIS WILL BE A PROBLEM!');
       }
+      console.log('  📍 Expected API behavior: Server should receive multipart/form-data with files');
+      console.log('  📍 Testing on: Real Device (not emulator)');
       
       console.log('📤 Sending multipart request...');
+      console.log('🚀 REACT NATIVE FETCH - DIRECT API CALL:');
+      console.log('  📍 URL:', `${this.baseURL}/driver/tasks/${taskId}/status`);
+      console.log('  📍 Method: PUT');
+      console.log('  📍 Using direct fetch (bypassing makeRequest for multipart)');
       
-      const response = await this.makeRequest(`/driver/tasks/${taskId}/status`, {
+      // Get authorization token
+      const token = await this.getAuthToken();
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+      
+      // Use direct fetch for React Native compatibility with multipart
+      const url = `${this.baseURL}/driver/tasks/${taskId}/status`;
+      console.log('🌐 DIRECT FETCH CALL:', {
+        url,
         method: 'PUT',
-        body: formData,
+        hasFormData: formData instanceof FormData,
+        hasToken: !!token
       });
       
-      console.log('📨 API CLIENT - Response received:', response);
+      // Debug: Try to inspect FormData before sending
+      console.log('🔍 DEBUGGING FormData before fetch...');
+      console.log('🔍 FormData type:', typeof formData);
+      console.log('🔍 FormData constructor:', formData.constructor.name);
+      
+      // Try alternative FormData construction for React Native
+      console.log('🔄 ALTERNATIVE: Creating new FormData with explicit method...');
+      const alternativeFormData = new FormData();
+      
+      // Add fields one by one with logging
+      alternativeFormData.append('status', 'delivered');
+      console.log('🔍 Alt FormData - Added status: delivered');
+      
+      if (data.notes) {
+        alternativeFormData.append('notes', data.notes);
+        console.log('🔍 Alt FormData - Added notes:', data.notes);
+      }
+      
+      if (data.otp) {
+        alternativeFormData.append('otp', data.otp);
+        console.log('🔍 Alt FormData - Added otp:', data.otp);
+      }
+      
+      // Add documents to alternative FormData
+      if (data.delivery_documents && data.delivery_documents.length > 0) {
+        data.delivery_documents.forEach((doc, index) => {
+          console.log(`🔍 Alt FormData - Processing document ${index}:`, {
+            name: doc.name,
+            type: doc.type,
+            uri: doc.uri?.substring(0, 50)
+          });
+          
+          const fileObj = {
+            uri: doc.uri,
+            type: doc.type,
+            name: doc.name,
+          };
+          
+          alternativeFormData.append(`delivery_documents[${index}]`, fileObj as any);
+          console.log(`🔍 Alt FormData - Added delivery_documents[${index}]`);
+        });
+      }
+      
+      console.log('🚀 Using ALTERNATIVE FormData for request...');
+      
+      console.log('🔄 TRYING POST METHOD with _method=PUT override for multipart...');
+      
+      // Add method override for Laravel/PHP servers
+      alternativeFormData.append('_method', 'PUT');
+      console.log('🔍 Added _method=PUT to FormData');
+      
+      const fetchResponse = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          // Do NOT set Content-Type for multipart - let fetch handle it
+        },
+        body: alternativeFormData
+      });
+      
+      console.log('📡 FETCH Response status:', fetchResponse.status);
+      console.log('📡 FETCH Response headers:', Object.fromEntries(fetchResponse.headers.entries()));
+      
+      const responseText = await fetchResponse.text();
+      console.log('📡 FETCH Response text:', responseText);
+      
+      let response;
+      try {
+        response = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ Failed to parse JSON response:', parseError);
+        response = { success: false, message: 'Invalid server response', rawResponse: responseText };
+      }
+      
+      console.log('📨 FINAL API CLIENT - Response processed:', response);
       return response;
       
     } catch (error) {

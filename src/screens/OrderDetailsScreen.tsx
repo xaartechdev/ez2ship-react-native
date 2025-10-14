@@ -207,7 +207,8 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
           // Complete delivery with documents
           setIsUploadingDoc(true);
           console.log('🚚 MARK DELIVERED - Starting document upload process');
-          console.log('📋 Order Details:', { 
+          console.log('� DEVICE TEST - Running on actual device (not emulator)');
+          console.log('�📋 Order Details:', { 
             taskId: task.id, 
             status: 'delivered', 
             notes: notes, 
@@ -219,8 +220,15 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
             name: doc.name,
             type: doc.type,
             uri: doc.uri ? doc.uri.substring(0, 50) + '...' : 'No URI',
-            size: doc.size || 'Unknown size'
+            size: doc.size || 'Unknown size',
+            hasAllRequiredFields: !!(doc.uri && doc.name && doc.type)
           })));
+          
+          if (deliveryDocuments.length === 0) {
+            console.log('⚠️ CRITICAL: No documents selected - API call will not include delivery_documents!');
+          } else {
+            console.log('✅ READY: Documents prepared for multipart upload to delivery_documents field');
+          }
           
           try {
             console.log('🔄 Calling orderService.updateOrderStatusWithDocuments...');
