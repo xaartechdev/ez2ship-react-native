@@ -94,6 +94,7 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
       const updateData = {
         first_name: formData.first_name || profile.first_name,
         last_name: formData.last_name || profile.last_name,
+        // Note: email updates are not supported by the API - will be filtered out
         email: formData.email || profile.email,
         phone: formData.phone || profile.phone,
         street_address: formData.street_address || profile.street_address,
@@ -238,15 +239,40 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
             {isEditing ? (
               <TextInput
                 style={styles.fieldInput}
-                value={`${formData.first_name || ''} ${formData.last_name || ''}`.trim()}
+                value={formData.first_name && formData.last_name ? 
+                  `${formData.first_name} ${formData.last_name}` :
+                  formData.first_name || ''
+                }
                 onChangeText={(text: string) => {
-                  // Allow all characters including spaces
-                  const names = text.split(' ');
-                  setFormData(prev => ({ 
-                    ...prev, 
-                    first_name: names[0] || '', 
-                    last_name: names.slice(1).join(' ') || ''
-                  }));
+                  // Handle name input more carefully to preserve spaces during typing
+                  if (text === '') {
+                    // If completely empty, clear both names
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      first_name: '', 
+                      last_name: ''
+                    }));
+                  } else {
+                    // Split by space but preserve trailing spaces for ongoing typing
+                    const spaceIndex = text.indexOf(' ');
+                    if (spaceIndex === -1) {
+                      // No space found, it's just first name
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        first_name: text, 
+                        last_name: ''
+                      }));
+                    } else {
+                      // Space found, split into first and last name
+                      const firstName = text.substring(0, spaceIndex);
+                      const lastName = text.substring(spaceIndex + 1); // Don't trim to preserve spaces
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        first_name: firstName, 
+                        last_name: lastName
+                      }));
+                    }
+                  }
                 }}
                 placeholder="Enter full name"
                 autoCapitalize="words"

@@ -241,6 +241,17 @@ class ApiClient {
         duration: `${requestDuration}ms`
       });
 
+      // Log detailed validation errors for debugging
+      if (response.status === 422 && responseData) {
+        console.error('❌ VALIDATION ERROR DETAILS:', {
+          status: response.status,
+          message: responseData.message,
+          errors: responseData.errors,
+          data: responseData.data,
+          fullResponse: responseData
+        });
+      }
+
       // Check for invalid token response and attempt refresh
       // Skip token refresh logic for refresh token requests to prevent infinite loop
       if (!isRefreshRequest && 
@@ -727,11 +738,25 @@ class ApiClient {
     emergency_contact_name?: string;
     emergency_contact_phone?: string;
     vehicle_number?: string;
+    // Note: email is NOT accepted by this API endpoint according to documentation
   }) {
-    return this.makeRequest('/driver/profile', {
+    console.log('📤 API CLIENT - updateProfile called with data:', JSON.stringify(data, null, 2));
+    
+    const response = await this.makeRequest('/driver/profile', {
       method: 'PUT',
       body: data,
     });
+    
+    console.log('📥 API CLIENT - updateProfile response:', {
+      success: response.success,
+      hasData: !!response.data,
+      message: response.message,
+      // Log validation errors if they exist
+      errors: response.errors || null,
+      fullResponse: response
+    });
+    
+    return response;
   }
 
   async uploadProfileImage(imageFile: File | any) {

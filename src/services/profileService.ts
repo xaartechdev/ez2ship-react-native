@@ -49,7 +49,7 @@ export interface ProfileResponse {
 export interface UpdateProfileRequest {
   first_name?: string;
   last_name?: string;
-  email?: string;
+  // email is NOT supported by the update profile API endpoint
   phone?: string;
   street_address?: string;
   city?: string;
@@ -57,7 +57,8 @@ export interface UpdateProfileRequest {
   zip_code?: string;
   emergency_contact_name?: string;
   emergency_contact_phone?: string;
-  emergency_contact_relationship?: string;
+  vehicle_number?: string;
+  // emergency_contact_relationship is not in the API spec
 }
 
 export interface ChangePasswordRequest {
@@ -119,15 +120,35 @@ class ProfileService {
 
   async updateProfile(data: UpdateProfileRequest): Promise<DriverProfile> {
     try {
+      console.log('🔄 PROFILE SERVICE - updateProfile called with data:', JSON.stringify(data, null, 2));
+      
       const response = await apiClient.updateProfile(data);
+      
+      console.log('📨 PROFILE SERVICE - API response received:', {
+        success: response.success,
+        hasData: !!response.data,
+        message: response.message
+      });
+      
       if (response.success && response.data) {
         // Handle different response structures
         const responseData = response.data as any;
-        return responseData.driver || responseData;
+        const profileData = responseData.driver || responseData;
+        
+        console.log('✅ PROFILE SERVICE - Profile data processed:', {
+          profileKeys: Object.keys(profileData),
+          firstName: profileData.first_name,
+          lastName: profileData.last_name,
+          email: profileData.email
+        });
+        
+        return profileData;
       } else {
+        console.error('❌ PROFILE SERVICE - API call failed:', response.message);
         throw new Error(response.message || 'Failed to update profile');
       }
     } catch (error: any) {
+      console.error('❌ PROFILE SERVICE - Error updating profile:', error.message);
       throw new Error(error.message || 'Failed to update profile');
     }
   }

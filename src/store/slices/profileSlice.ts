@@ -50,41 +50,51 @@ export const updateProfile = createAsyncThunk(
       console.log('=== PROFILE UPDATE START ===');
       console.log('📝 Profile data to update:', JSON.stringify(profileData, null, 2));
       
-      // TODO: Replace with actual API call when backend is ready
-      // const response = await apiClient.updateProfile(profileData);
+      // Import profile service dynamically to avoid circular dependencies
+      const { profileService } = await import('../../services/profileService');
       
-      // For now, simulate API call with delay
-      await new Promise<void>(resolve => setTimeout(resolve, 1000));
+      // Filter out fields that are not supported by the update profile API
+      const allowedFields = [
+        'first_name', 'last_name', 'phone', 'street_address', 'city', 'state', 
+        'zip_code', 'emergency_contact_name', 'emergency_contact_phone', 'vehicle_number'
+      ];
       
-      // Get current profile data
+      const apiUpdateData = Object.keys(profileData)
+        .filter(key => allowedFields.includes(key))
+        .reduce((obj, key) => {
+          const value = profileData[key];
+          // Only include non-empty values to avoid validation issues with empty strings
+          if (value !== null && value !== undefined && value !== '') {
+            obj[key] = value;
+          }
+          return obj;
+        }, {} as any);
+      
+      console.log('🚀 REDUX - Calling API to update profile...');
+      console.log('📝 REDUX - Filtered API data (excluding unsupported fields):', JSON.stringify(apiUpdateData, null, 2));
+      
+      const updatedProfile = await profileService.updateProfile(apiUpdateData);
+      
+      console.log('✅ REDUX - Profile updated successfully via API:', {
+        profileKeys: Object.keys(updatedProfile),
+        firstName: updatedProfile.first_name,
+        lastName: updatedProfile.last_name,
+        email: updatedProfile.email
+      });
+      
+      // Update auth user data as well since profile and user data should stay in sync
       const state = getState() as any;
-      const currentProfile = state.profile.profile;
       const currentUser = state.auth.user;
       
-      if (!currentProfile || !currentUser) {
-        throw new Error('No current profile or user data available');
+      if (currentUser) {
+        // Import auth slice action
+        const { updateUser } = await import('./authSlice');
+        dispatch(updateUser({
+          ...currentUser,
+          ...profileData
+        }));
+        console.log('🔄 REDUX - Auth user data synchronized with profile update');
       }
-      
-      // Merge updated data with current profile
-      const updatedProfile = {
-        ...currentProfile,
-        ...profileData
-      };
-      
-      // Update auth user state with new profile data
-      const authUpdateData: any = {};
-      if (profileData.first_name !== undefined) authUpdateData.first_name = profileData.first_name;
-      if (profileData.last_name !== undefined) authUpdateData.last_name = profileData.last_name;
-      if (profileData.email !== undefined) authUpdateData.email = profileData.email;
-      if (profileData.phone !== undefined) authUpdateData.phone = profileData.phone;
-      if (profileData.profile_image !== undefined) authUpdateData.profile_image = profileData.profile_image;
-      
-      // Import updateUser action from authSlice
-      const { updateUser } = await import('./authSlice');
-      dispatch(updateUser(authUpdateData));
-      
-      console.log('✅ Profile updated successfully');
-      console.log('👤 Updated profile:', JSON.stringify(updatedProfile, null, 2));
       
       return updatedProfile;
     } catch (error: any) {
@@ -207,7 +217,17 @@ const profileSlice = createSlice({
       })
       .addCase(updateProfile.fulfilled, (state, action) => {
         state.loading = false;
-        state.profile = action.payload;
+        
+        // Convert DriverProfile to ProfileData, handling type differences
+        const driverProfile = action.payload;
+        const profileData: ProfileData = {
+          ...driverProfile,
+          rating: typeof driverProfile.rating === 'string' ? parseFloat(driverProfile.rating) : driverProfile.rating,
+          total_trips: typeof driverProfile.total_trips === 'string' ? parseInt(driverProfile.total_trips, 10) : driverProfile.total_trips,
+          on_time_rate: typeof driverProfile.on_time_rate === 'string' ? parseFloat(driverProfile.on_time_rate) : driverProfile.on_time_rate,
+        };
+        
+        state.profile = profileData;
       })
       .addCase(updateProfile.rejected, (state, action) => {
         state.loading = false;
