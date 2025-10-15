@@ -3,25 +3,35 @@ import { notificationsService, Notification, NotificationsResponse } from '../..
 
 export interface NotificationsState {
   notifications: Notification[];
-  unreadCount: number;
+  counts: {
+    all: number;
+    unread: number;
+  };
   loading: boolean;
   error: string | null;
   pagination: {
     current_page: number;
+    last_page: number;
     per_page: number;
     total: number;
-    last_page: number;
     has_more: boolean;
+  } | null;
+  filters: {
+    available_filters: string[];
   } | null;
   lastFetch: number | null;
 }
 
 const initialState: NotificationsState = {
   notifications: [],
-  unreadCount: 0,
+  counts: {
+    all: 0,
+    unread: 0,
+  },
   loading: false,
   error: null,
   pagination: null,
+  filters: null,
   lastFetch: null,
 };
 
@@ -29,13 +39,23 @@ const initialState: NotificationsState = {
 export const fetchNotifications = createAsyncThunk(
   'notifications/fetchNotifications',
   async (params?: {
+    filter?: 'all' | 'unread' | 'read';
     per_page?: number;
     page?: number;
-    unread_only?: boolean;
   }) => {
+    console.log('🚀 REDUX - fetchNotifications thunk started');
+    console.log('📋 Parameters:', params);
+    
     const response = await notificationsService.getNotifications(params);
+    
+    console.log('📨 REDUX - Notifications service response:', {
+      success: response.success,
+      hasData: !!response.data,
+      message: response.message
+    });
+    
     if (!response.success) {
-      throw new Error(response.message);
+      throw new Error(response.message || 'Failed to fetch notifications');
     }
     return response;
   }
@@ -83,22 +103,24 @@ const notificationsSlice = createSlice({
     },
     clearNotifications: (state) => {
       state.notifications = [];
-      state.unreadCount = 0;
+      state.counts = { all: 0, unread: 0 };
       state.pagination = null;
+      state.filters = null;
       state.lastFetch = null;
     },
     addNotification: (state, action: PayloadAction<Notification>) => {
       // Add new notification to the beginning of the list
       state.notifications.unshift(action.payload);
-      if (!action.payload.read_at) {
-        state.unreadCount += 1;
+      if (!action.payload.is_read) {
+        state.counts.unread += 1;
       }
+      state.counts.all += 1;
     },
     updateNotificationLocally: (state, action: PayloadAction<{ id: number; updates: Partial<Notification> }>) => {
       const index = state.notifications.findIndex(n => n.id === action.payload.id);
       if (index !== -1) {
-        const wasUnread = !state.notifications[index].read_at;
-        const willBeRead = action.payload.updates.read_at;
+        const wasUnread = !state.notifications[index].is_read;
+        const willBeRead = action.payload.updates.is_read || action.payload.updates.read_at;
         
         state.notifications[index] = {
           ...state.notifications[index],
@@ -107,7 +129,7 @@ const notificationsSlice = createSlice({
 
         // Update unread count if read status changed
         if (wasUnread && willBeRead) {
-          state.unreadCount = Math.max(0, state.unreadCount - 1);
+          state.counts.unread = Math.max(0, state.counts.unread - 1);
         }
       }
     },
@@ -122,10 +144,17 @@ const notificationsSlice = createSlice({
       .addCase(fetchNotifications.fulfilled, (state, action) => {
         state.loading = false;
         state.error = null;
+        
+        console.log('✅ REDUX - fetchNotifications fulfilled:', {
+          hasData: !!action.payload.data,
+          notificationCount: action.payload.data?.notifications?.length || 0
+        });
+        
         if (action.payload.data) {
           state.notifications = action.payload.data.notifications;
-          state.unreadCount = action.payload.data.unread_count;
+          state.counts = action.payload.data.counts;
           state.pagination = action.payload.data.pagination;
+          state.filters = action.payload.data.filters;
         }
         state.lastFetch = Date.now();
       })
@@ -141,9 +170,10 @@ const notificationsSlice = createSlice({
       .addCase(markNotificationAsRead.fulfilled, (state, action) => {
         const { notificationId } = action.payload;
         const notification = state.notifications.find(n => n.id === notificationId);
-        if (notification && !notification.read_at) {
+        if (notification && !notification.is_read) {
+          notification.is_read = true;
           notification.read_at = new Date().toISOString();
-          state.unreadCount = Math.max(0, state.unreadCount - 1);
+          state.counts.unread = Math.max(0, state.counts.unread - 1);
         }
       })
       .addCase(markNotificationAsRead.rejected, (state, action) => {
@@ -157,11 +187,12 @@ const notificationsSlice = createSlice({
       .addCase(markAllNotificationsAsRead.fulfilled, (state) => {
         const currentTime = new Date().toISOString();
         state.notifications.forEach(notification => {
-          if (!notification.read_at) {
+          if (!notification.is_read) {
+            notification.is_read = true;
             notification.read_at = currentTime;
           }
         });
-        state.unreadCount = 0;
+        state.counts.unread = 0;
       })
       .addCase(markAllNotificationsAsRead.rejected, (state, action) => {
         state.error = action.error.message || 'Failed to mark all notifications as read';
@@ -176,9 +207,10 @@ const notificationsSlice = createSlice({
         const notificationIndex = state.notifications.findIndex(n => n.id === notificationId);
         if (notificationIndex !== -1) {
           const notification = state.notifications[notificationIndex];
-          if (!notification.read_at) {
-            state.unreadCount = Math.max(0, state.unreadCount - 1);
+          if (!notification.is_read) {
+            state.counts.unread = Math.max(0, state.counts.unread - 1);
           }
+          state.counts.all = Math.max(0, state.counts.all - 1);
           state.notifications.splice(notificationIndex, 1);
         }
       })
@@ -199,10 +231,17 @@ export default notificationsSlice.reducer;
 
 // Selectors
 export const selectNotifications = (state: { notifications: NotificationsState }) => state.notifications.notifications;
-export const selectUnreadCount = (state: { notifications: NotificationsState }) => state.notifications.unreadCount;
+export const selectUnreadCount = (state: { notifications: NotificationsState }) => {
+  const count = state.notifications.counts.unread;
+  console.log('🔍 SELECTOR - selectUnreadCount called, returning:', count);
+  return count;
+};
+export const selectAllCount = (state: { notifications: NotificationsState }) => state.notifications.counts.all;
+export const selectNotificationsCounts = (state: { notifications: NotificationsState }) => state.notifications.counts;
 export const selectNotificationsLoading = (state: { notifications: NotificationsState }) => state.notifications.loading;
 export const selectNotificationsError = (state: { notifications: NotificationsState }) => state.notifications.error;
 export const selectUnreadNotifications = (state: { notifications: NotificationsState }) => 
-  state.notifications.notifications.filter(n => !n.read_at);
+  state.notifications.notifications.filter(n => !n.is_read);
 export const selectNotificationsPagination = (state: { notifications: NotificationsState }) => state.notifications.pagination;
+export const selectNotificationsFilters = (state: { notifications: NotificationsState }) => state.notifications.filters;
 export const selectLastFetch = (state: { notifications: NotificationsState }) => state.notifications.lastFetch;

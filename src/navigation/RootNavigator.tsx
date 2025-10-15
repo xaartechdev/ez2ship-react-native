@@ -2,10 +2,11 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useSelector } from 'react-redux';
-import { Text, Platform } from 'react-native';
+import { useSelector, useDispatch } from 'react-redux';
+import { Text, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { RootState } from '../store';
+import { RootState, AppDispatch } from '../store';
+import { selectUnreadCount, fetchNotifications } from '../store/slices/notificationsSlice';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -26,16 +27,60 @@ import ProofOfDeliveryScreen from '../screens/ProofOfDeliveryScreen';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Simple Tab Icon Component
-const TabIcon = ({ icon, color }: { icon: string; color: string }) => (
-  <Text style={{ fontSize: 20, color: color === '#007AFF' ? color : '#6c757d' }}>
-    {icon}
-  </Text>
+// Tab Icon Component with Badge Support
+const TabIcon = ({ 
+  icon, 
+  color, 
+  badgeCount 
+}: { 
+  icon: string; 
+  color: string; 
+  badgeCount?: number;
+}) => (
+  <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
+    <Text style={{ fontSize: 20, color: color === '#007AFF' ? color : '#6c757d' }}>
+      {icon}
+    </Text>
+    {badgeCount !== undefined && badgeCount > 0 && (
+      <View style={{
+        position: 'absolute',
+        top: -6,
+        right: -10,
+        backgroundColor: '#FF3B30',
+        borderRadius: 10,
+        minWidth: 18,
+        height: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 4,
+        borderWidth: 2,
+        borderColor: '#ffffff',
+      }}>
+        <Text style={{
+          color: '#ffffff',
+          fontSize: 10,
+          fontWeight: '600',
+        }}>
+          {badgeCount > 99 ? '99+' : badgeCount}
+        </Text>
+      </View>
+    )}
+  </View>
 );
 
 // Bottom Tab Navigator for main app screens
 const MainTabNavigator = () => {
+  const dispatch = useDispatch<AppDispatch>();
   const insets = useSafeAreaInsets();
+  const unreadNotificationsCount = useSelector(selectUnreadCount);
+  
+  // Fetch notifications when the main navigator loads to get initial counts
+  React.useEffect(() => {
+    console.log('📱 ROOT NAVIGATOR - Fetching notifications for initial count');
+    dispatch(fetchNotifications({ filter: 'all' }));
+  }, [dispatch]);
+
+  console.log('🔔 ROOT NAVIGATOR - Unread count:', unreadNotificationsCount);
   
   return (
     <Tab.Navigator
@@ -83,13 +128,17 @@ const MainTabNavigator = () => {
         }}
       />
       <Tab.Screen
-        name="Alerts"
+        name="Notifications"
         component={AlertsScreen}
         options={{
           tabBarIcon: ({ color }) => (
-            <TabIcon icon="🔔" color={color} />
+            <TabIcon 
+              icon="🔔" 
+              color={color} 
+              badgeCount={unreadNotificationsCount}
+            />
           ),
-          tabBarBadge: 5,
+          tabBarBadge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined,
         }}
       />
       <Tab.Screen

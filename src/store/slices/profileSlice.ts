@@ -99,14 +99,25 @@ export const fetchProfile = createAsyncThunk(
   'profile/fetchProfile',
   async (_, { rejectWithValue, getState }) => {
     try {
+      console.log('🚀 REDUX - fetchProfile thunk started');
+      
       // Get user data from auth state
       const state = getState() as any;
       const user = state.auth.user;
       
+      console.log('📋 REDUX - Auth state user data:', {
+        hasUser: !!user,
+        userId: user?.id,
+        email: user?.email,
+        firstName: user?.first_name,
+        lastName: user?.last_name,
+        fullUser: user
+      });
+      
       if (user) {
-        return {
+        const profileData = {
           first_name: user.first_name || 'Driver',
-          last_name: user.last_name || 'User',
+          last_name: user.last_name || 'Driver User',
           email: user.email || 'driver@example.com',
           phone: user.phone || '+1234567890',
           driver_id: user.driver_id || 'DRV001',
@@ -138,10 +149,23 @@ export const fetchProfile = createAsyncThunk(
           on_time_rate: user.on_time_rate || 0,
           join_date: user.join_date || null
         };
+        
+        console.log('✅ REDUX - Profile data constructed successfully:', {
+          profileKeys: Object.keys(profileData),
+          firstName: profileData.first_name,
+          lastName: profileData.last_name,
+          email: profileData.email,
+          driverId: profileData.driver_id,
+          constructedProfile: profileData
+        });
+        
+        return profileData;
       } else {
+        console.log('❌ REDUX - No user data available in auth state');
         return rejectWithValue('No user data available');
       }
     } catch (error) {
+      console.error('❌ REDUX - Error in fetchProfile thunk:', error);
       return rejectWithValue((error as Error).message);
     }
   }

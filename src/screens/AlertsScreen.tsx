@@ -23,7 +23,7 @@ import {
   selectNotificationsError,
   clearError,
 } from '../store/slices/notificationsSlice';
-import { notificationsService } from '../services/notificationsService';
+import { notificationsService, Notification } from '../services/notificationsService';
 
 interface AlertsScreenProps {
   navigation: any;
@@ -40,8 +40,9 @@ const AlertsScreen: React.FC<AlertsScreenProps> = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    dispatch(fetchNotifications());
-  }, [dispatch]);
+    console.log('📱 ALERTS SCREEN - Component mounted, fetching notifications');
+    dispatch(fetchNotifications({ filter: activeFilter }));
+  }, [dispatch, activeFilter]);
 
   useEffect(() => {
     if (error) {
@@ -50,18 +51,16 @@ const AlertsScreen: React.FC<AlertsScreenProps> = ({ navigation }) => {
     }
   }, [error, dispatch]);
 
-  const filteredNotifications = notifications.filter(notification => {
-    if (activeFilter === 'unread') {
-      return !notification.read_at;
-    }
-    return true;
-  });
+  // No need for client-side filtering since API handles it
+  const filteredNotifications = notifications;
 
-  const allCount = notifications.length;
+  // Get counts from Redux state
+  const counts = useSelector((state: any) => state.notifications.counts);
 
   const handleRefresh = async () => {
+    console.log('🔄 ALERTS SCREEN - Refreshing notifications with filter:', activeFilter);
     setRefreshing(true);
-    await dispatch(fetchNotifications());
+    await dispatch(fetchNotifications({ filter: activeFilter }));
     setRefreshing(false);
   };
 
@@ -102,8 +101,8 @@ const AlertsScreen: React.FC<AlertsScreenProps> = ({ navigation }) => {
     );
   };
 
-  const getNotificationIcon = (type: string) => {
-    return notificationsService.getNotificationIcon(type as any);
+  const getNotificationIcon = (notification: Notification) => {
+    return notificationsService.getNotificationIcon(notification);
   };
 
   const getNotificationColor = (type: string) => {
@@ -141,7 +140,7 @@ const AlertsScreen: React.FC<AlertsScreenProps> = ({ navigation }) => {
             styles.filterText,
             activeFilter === 'all' && styles.activeFilterText
           ]}>
-            All ({allCount})
+            All ({counts?.all || 0})
           </Text>
         </TouchableOpacity>
         
@@ -156,7 +155,7 @@ const AlertsScreen: React.FC<AlertsScreenProps> = ({ navigation }) => {
             styles.filterText,
             activeFilter === 'unread' && styles.activeFilterText
           ]}>
-            Unread ({unreadCount})
+            Unread ({counts?.unread || 0})
           </Text>
         </TouchableOpacity>
       </View>
@@ -190,7 +189,7 @@ const AlertsScreen: React.FC<AlertsScreenProps> = ({ navigation }) => {
         ) : (
           filteredNotifications.map((notification) => {
             const iconColor = getNotificationColor(notification.type);
-            const icon = getNotificationIcon(notification.type);
+            const icon = getNotificationIcon(notification);
             
             return (
               <View key={notification.id} style={styles.notificationCard}>
@@ -218,11 +217,11 @@ const AlertsScreen: React.FC<AlertsScreenProps> = ({ navigation }) => {
                     </View>
                     
                     <View style={styles.notificationActions}>
-                      {!notification.read_at && (
+                      {!notification.is_read && (
                         <View style={styles.unreadDot} />
                       )}
                       <View style={styles.actionButtons}>
-                        {!notification.read_at && (
+                        {!notification.is_read && (
                           <TouchableOpacity 
                             style={styles.markReadButton}
                             onPress={() => handleMarkAsRead(notification.id)}

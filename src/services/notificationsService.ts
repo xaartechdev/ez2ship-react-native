@@ -2,121 +2,120 @@ import { apiClient } from './apiClient';
 
 export interface Notification {
   id: number;
-  type: 'new_order' | 'trip_update' | 'message' | 'cancelled' | 'task_accepted' | 'task_completed';
+  type: string; // 'order_assigned', etc.
   title: string;
   message: string;
-  data?: any;
+  action_url?: string;
+  is_read: boolean;
   read_at: string | null;
   created_at: string;
-  updated_at: string;
+  icon?: string;
+  order_id?: string;
+  status?: string;
 }
 
 export interface NotificationsResponse {
   success: boolean;
-  message: string;
+  message?: string;
   data?: {
+    counts: {
+      all: number;
+      unread: number;
+    };
     notifications: Notification[];
-    unread_count: number;
     pagination: {
       current_page: number;
+      last_page: number;
       per_page: number;
       total: number;
-      last_page: number;
       has_more: boolean;
+    };
+    filters: {
+      available_filters: string[];
     };
   };
 }
 
 class NotificationsService {
-  // Since there's no specific notifications endpoint in the API docs,
-  // I'll create a mock service that can be easily replaced when the real endpoint is available
-  
   async getNotifications(params?: {
+    filter?: 'all' | 'unread' | 'read';
     per_page?: number;
     page?: number;
-    unread_only?: boolean;
   }): Promise<NotificationsResponse> {
     try {
-      // Mock notifications data for now
-      // In real implementation, this would call the actual API endpoint
-      const mockNotifications: Notification[] = [
-        {
-          id: 1,
-          type: 'new_order',
-          title: 'New Order Assigned',
-          message: 'A new delivery order has been assigned to you',
-          data: { order_id: 'ORD-001' },
-          read_at: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: 2,
-          type: 'trip_update',
-          title: 'Trip Status Update',
-          message: 'Your current trip status has been updated',
-          data: { trip_id: 'TRP-001' },
-          read_at: new Date().toISOString(),
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-          updated_at: new Date(Date.now() - 3600000).toISOString(),
-        },
-        {
-          id: 3,
-          type: 'task_completed',
-          title: 'Task Completed',
-          message: 'You have successfully completed a delivery task',
-          data: { task_id: 123 },
-          read_at: new Date().toISOString(),
-          created_at: new Date(Date.now() - 7200000).toISOString(),
-          updated_at: new Date(Date.now() - 7200000).toISOString(),
-        },
-      ];
-
-      let filteredNotifications = mockNotifications;
+      console.log('🚀 NOTIFICATIONS SERVICE - getNotifications() started');
+      console.log('📋 Parameters:', params);
       
-      if (params?.unread_only) {
-        filteredNotifications = mockNotifications.filter(n => !n.read_at);
-      }
-
-      const unreadCount = mockNotifications.filter(n => !n.read_at).length;
-
-      return {
-        success: true,
-        message: 'Notifications retrieved successfully',
-        data: {
-          notifications: filteredNotifications,
-          unread_count: unreadCount,
-          pagination: {
-            current_page: 1,
-            per_page: 15,
-            total: filteredNotifications.length,
-            last_page: 1,
-            has_more: false,
-          },
-        },
+      // Convert unread_only to filter for API compatibility
+      const apiParams = {
+        filter: params?.filter || 'all',
+        per_page: params?.per_page || 15,
+        page: params?.page || 1
       };
+      
+      const response = await apiClient.getNotifications(apiParams);
+      
+      console.log('📨 NOTIFICATIONS SERVICE - API response:', {
+        success: response.success,
+        hasData: !!response.data,
+        notificationCount: (response.data as any)?.notifications?.length || 0,
+        unreadCount: (response.data as any)?.counts?.unread || 0,
+        totalCount: (response.data as any)?.counts?.all || 0
+      });
+
+      if (response.success && response.data) {
+        const responseData = response.data as {
+          counts: { all: number; unread: number; };
+          notifications: Notification[];
+          pagination: {
+            current_page: number;
+            last_page: number;
+            per_page: number;
+            total: number;
+            has_more: boolean;
+          };
+          filters: {
+            available_filters: string[];
+          };
+        };
+        
+        return {
+          success: true,
+          data: responseData
+        };
+      } else {
+        throw new Error(response.message || 'Failed to fetch notifications');
+      }
     } catch (error: any) {
+      console.error('❌ NOTIFICATIONS SERVICE - Error:', error);
       return {
         success: false,
-        message: error.message || 'Failed to fetch notifications',
+        message: error.message || 'Failed to fetch notifications'
       };
     }
   }
-
   async markAsRead(notificationId: number): Promise<{
     success: boolean;
     message: string;
   }> {
     try {
-      // Mock marking as read
-      // In real implementation, this would call the actual API endpoint
-      await new Promise<void>(resolve => setTimeout(resolve, 500));
-
-      return {
-        success: true,
-        message: 'Notification marked as read',
-      };
+      console.log('🚀 NOTIFICATIONS SERVICE - markAsRead() started');
+      console.log('📋 Notification ID:', notificationId);
+      
+      const response = await apiClient.markNotificationAsRead(notificationId);
+      
+      console.log('📨 NOTIFICATIONS SERVICE - Mark as read response:', response);
+      
+      if (response.success) {
+        return {
+          success: true,
+          message: response.message || 'Notification marked as read',
+        };
+      } else {
+        throw new Error(response.message || 'Failed to mark notification as read');
+      }
     } catch (error: any) {
+      console.error('❌ NOTIFICATIONS SERVICE - Mark as read error:', error);
       return {
         success: false,
         message: error.message || 'Failed to mark notification as read',
@@ -129,15 +128,22 @@ class NotificationsService {
     message: string;
   }> {
     try {
-      // Mock marking all as read
-      // In real implementation, this would call the actual API endpoint
-      await new Promise<void>(resolve => setTimeout(resolve, 1000));
-
-      return {
-        success: true,
-        message: 'All notifications marked as read',
-      };
+      console.log('🚀 NOTIFICATIONS SERVICE - markAllAsRead() started');
+      
+      const response = await apiClient.markAllNotificationsAsRead();
+      
+      console.log('📨 NOTIFICATIONS SERVICE - Mark all as read response:', response);
+      
+      if (response.success) {
+        return {
+          success: true,
+          message: response.message || 'All notifications marked as read',
+        };
+      } else {
+        throw new Error(response.message || 'Failed to mark all notifications as read');
+      }
     } catch (error: any) {
+      console.error('❌ NOTIFICATIONS SERVICE - Mark all as read error:', error);
       return {
         success: false,
         message: error.message || 'Failed to mark all notifications as read',
@@ -150,15 +156,23 @@ class NotificationsService {
     message: string;
   }> {
     try {
-      // Mock deleting notification
-      // In real implementation, this would call the actual API endpoint
-      await new Promise<void>(resolve => setTimeout(resolve, 500));
-
-      return {
-        success: true,
-        message: 'Notification deleted successfully',
-      };
+      console.log('🚀 NOTIFICATIONS SERVICE - deleteNotification() started');
+      console.log('📋 Notification ID:', notificationId);
+      
+      const response = await apiClient.deleteNotification(notificationId);
+      
+      console.log('📨 NOTIFICATIONS SERVICE - Delete response:', response);
+      
+      if (response.success) {
+        return {
+          success: true,
+          message: response.message || 'Notification deleted successfully',
+        };
+      } else {
+        throw new Error(response.message || 'Failed to delete notification');
+      }
     } catch (error: any) {
+      console.error('❌ NOTIFICATIONS SERVICE - Delete error:', error);
       return {
         success: false,
         message: error.message || 'Failed to delete notification',
@@ -167,9 +181,14 @@ class NotificationsService {
   }
 
   // Helper methods
-  getNotificationIcon(type: Notification['type']): string {
-    switch (type) {
-      case 'new_order': return '📦';
+  getNotificationIcon(notification: Notification): string {
+    // Use icon from API if available, otherwise determine by type
+    if (notification.icon) {
+      return this.convertIconName(notification.icon);
+    }
+    
+    switch (notification.type) {
+      case 'order_assigned': return '📦';
       case 'trip_update': return '🚚';
       case 'message': return '💬';
       case 'cancelled': return '❌';
@@ -178,10 +197,22 @@ class NotificationsService {
       default: return '🔔';
     }
   }
+  
+  private convertIconName(iconName: string): string {
+    switch (iconName) {
+      case 'truck': return '🚚';
+      case 'package': return '📦';
+      case 'check': return '✅';
+      case 'x': return '❌';
+      case 'bell': return '🔔';
+      case 'message': return '💬';
+      default: return '🔔';
+    }
+  }
 
   getNotificationColor(type: Notification['type']): string {
     switch (type) {
-      case 'new_order': return '#007AFF';
+      case 'order_assigned': return '#007AFF';
       case 'trip_update': return '#FF9500';
       case 'message': return '#34C759';
       case 'cancelled': return '#FF3B30';

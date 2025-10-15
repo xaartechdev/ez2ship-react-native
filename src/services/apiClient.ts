@@ -188,9 +188,9 @@ class ApiClient {
         try {
           // Note: FormData.entries() might not be available in all React Native versions
           // This is just for debugging purposes
-          if (body.entries) {
+          if ((body as any).entries) {
             let entryCount = 0;
-            for (const [key, value] of body.entries()) {
+            for (const [key, value] of (body as any).entries()) {
               entryCount++;
               console.log(`  Entry ${entryCount}: ${key} = ${typeof value === 'object' ? 'File object' : value}`);
             }
@@ -686,9 +686,9 @@ class ApiClient {
     } catch (error) {
       console.error('❌ API CLIENT ERROR in updateTaskStatusWithDocuments:', error);
       console.error('❌ Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
+        message: (error as Error).message,
+        stack: (error as Error).stack,
+        name: (error as Error).name
       });
       throw error;
     }
@@ -696,7 +696,24 @@ class ApiClient {
 
   // Profile methods
   async getProfile() {
-    return this.makeRequest('/driver/profile');
+    console.log('🔍 API CLIENT - getProfile() called');
+    console.log('📍 Endpoint: GET /driver/profile');
+    console.log('🌐 Full URL:', `${this.baseURL}/driver/profile`);
+    
+    try {
+      const response = await this.makeRequest('/driver/profile');
+      console.log('📨 API CLIENT - Profile response received:', {
+        success: response.success,
+        hasData: !!response.data,
+        message: response.message,
+        dataKeys: response.data ? Object.keys(response.data) : [],
+        fullResponse: response
+      });
+      return response;
+    } catch (error) {
+      console.error('❌ API CLIENT - Profile request failed:', error);
+      throw error;
+    }
   }
 
   async updateProfile(data: {
@@ -825,6 +842,90 @@ class ApiClient {
       method: 'POST',
       body: data,
     });
+  }
+
+  // Notifications methods
+  async getNotifications(params?: {
+    filter?: 'all' | 'unread' | 'read';
+    per_page?: number;
+    page?: number;
+  }) {
+    console.log('🔍 API CLIENT - getNotifications() called');
+    console.log('📋 Parameters:', params);
+    
+    let queryString = '';
+    if (params) {
+      const searchParams = new URLSearchParams();
+      if (params.filter) searchParams.append('filter', params.filter);
+      if (params.per_page) searchParams.append('per_page', params.per_page.toString());
+      if (params.page) searchParams.append('page', params.page.toString());
+      queryString = searchParams.toString();
+    }
+    
+    const endpoint = queryString ? `/driver/notifications?${queryString}` : '/driver/notifications';
+    console.log('📍 Endpoint:', endpoint);
+    
+    try {
+      const response = await this.makeRequest(endpoint);
+      console.log('📨 API CLIENT - Notifications response received:', {
+        success: response.success,
+        hasData: !!response.data,
+        notificationCount: (response.data as any)?.notifications?.length || 0,
+        unreadCount: (response.data as any)?.counts?.unread || 0,
+        totalCount: (response.data as any)?.counts?.all || 0
+      });
+      return response;
+    } catch (error) {
+      console.error('❌ API CLIENT - Get notifications failed:', error);
+      throw error;
+    }
+  }
+
+  async markNotificationAsRead(notificationId: number) {
+    console.log('🔍 API CLIENT - markNotificationAsRead() called');
+    console.log('📋 Notification ID:', notificationId);
+    
+    try {
+      const response = await this.makeRequest(`/driver/notifications/${notificationId}/read`, {
+        method: 'PUT'
+      });
+      console.log('📨 API CLIENT - Mark as read response:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ API CLIENT - Mark as read failed:', error);
+      throw error;
+    }
+  }
+
+  async markAllNotificationsAsRead() {
+    console.log('🔍 API CLIENT - markAllNotificationsAsRead() called');
+    
+    try {
+      const response = await this.makeRequest('/driver/notifications/mark-all-read', {
+        method: 'PUT'
+      });
+      console.log('📨 API CLIENT - Mark all as read response:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ API CLIENT - Mark all as read failed:', error);
+      throw error;
+    }
+  }
+
+  async deleteNotification(notificationId: number) {
+    console.log('🔍 API CLIENT - deleteNotification() called');
+    console.log('📋 Notification ID:', notificationId);
+    
+    try {
+      const response = await this.makeRequest(`/driver/notifications/${notificationId}`, {
+        method: 'DELETE'
+      });
+      console.log('📨 API CLIENT - Delete notification response:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ API CLIENT - Delete notification failed:', error);
+      throw error;
+    }
   }
 }
 

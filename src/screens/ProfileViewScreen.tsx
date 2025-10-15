@@ -26,14 +26,26 @@ const ProfileViewScreen: React.FC<ProfileViewScreenProps> = ({ navigation }) => 
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('📱 PROFILE SCREEN - Component mounted, dispatching fetchProfile');
     dispatch(fetchProfile());
   }, [dispatch]);
 
   useEffect(() => {
+    console.log('📱 PROFILE SCREEN - Profile data updated:', {
+      hasProfile: !!profile,
+      profileKeys: profile ? Object.keys(profile) : [],
+      firstName: profile?.first_name,
+      lastName: profile?.last_name,
+      email: profile?.email,
+      profileImage: profile?.profile_image,
+      loading: loading,
+      fullProfile: profile
+    });
+    
     if (profile?.profile_image) {
       setProfileImage(profile.profile_image);
     }
-  }, [profile]);
+  }, [profile, loading]);
 
   const handleEditProfile = () => {
     // TODO: Navigate to edit profile screen when implemented
@@ -138,7 +150,7 @@ const ProfileViewScreen: React.FC<ProfileViewScreenProps> = ({ navigation }) => 
 
           <View style={styles.infoItem}>
             <Text style={styles.infoLabel}>Date of Birth</Text>
-            <Text style={styles.infoValue}>{formatDate(profile?.date_of_birth)}</Text>
+            <Text style={styles.infoValue}>{formatDate(profile?.date_of_birth || undefined)}</Text>
           </View>
 
           <View style={styles.infoItem}>
@@ -158,7 +170,7 @@ const ProfileViewScreen: React.FC<ProfileViewScreenProps> = ({ navigation }) => 
 
           <View style={styles.infoItem}>
             <Text style={styles.infoLabel}>License Expiry</Text>
-            <Text style={styles.infoValue}>{formatDate(profile?.license_expiry)}</Text>
+            <Text style={styles.infoValue}>{formatDate(profile?.license_expiry || undefined)}</Text>
           </View>
 
           <View style={styles.infoItem}>
@@ -227,7 +239,7 @@ const ProfileViewScreen: React.FC<ProfileViewScreenProps> = ({ navigation }) => 
 
           <View style={styles.infoItem}>
             <Text style={styles.infoLabel}>Join Date</Text>
-            <Text style={styles.infoValue}>{formatDate(profile?.join_date)}</Text>
+            <Text style={styles.infoValue}>{formatDate(profile?.join_date || undefined)}</Text>
           </View>
         </View>
 

@@ -69,15 +69,50 @@ export interface ChangePasswordRequest {
 class ProfileService {
   async getProfile(): Promise<DriverProfile> {
     try {
+      console.log('🚀 PROFILE SERVICE - getProfile() started');
+      
       const response = await apiClient.getProfile();
+      
+      console.log('📋 PROFILE SERVICE - Raw API response:', {
+        success: response.success,
+        message: response.message,
+        hasData: !!response.data,
+        dataType: typeof response.data,
+        dataKeys: response.data ? Object.keys(response.data) : [],
+        rawData: response.data
+      });
+      
       if (response.success && response.data) {
         // Handle different response structures
         const data = response.data as any;
-        return data.driver || data;
+        const profile = data.driver || data;
+        
+        console.log('✅ PROFILE SERVICE - Profile data processed:', {
+          profileKeys: Object.keys(profile),
+          id: profile.id,
+          firstName: profile.first_name,
+          lastName: profile.last_name,
+          email: profile.email,
+          phone: profile.phone,
+          processedProfile: profile
+        });
+        
+        return profile;
       } else {
+        console.error('❌ PROFILE SERVICE - Response indicates failure:', {
+          success: response.success,
+          message: response.message,
+          data: response.data
+        });
         throw new Error(response.message || 'Failed to fetch profile');
       }
     } catch (error: any) {
+      console.error('❌ PROFILE SERVICE - Error occurred:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        fullError: error
+      });
       throw new Error(error.message || 'Failed to fetch profile');
     }
   }
@@ -99,7 +134,11 @@ class ProfileService {
 
   async changePassword(data: ChangePasswordRequest): Promise<void> {
     try {
-      const response = await apiClient.changePassword(data);
+      const response = await apiClient.changePassword(
+        data.current_password,
+        data.new_password,
+        data.new_password_confirmation
+      );
       if (!response.success) {
         throw new Error(response.message || 'Failed to change password');
       }
