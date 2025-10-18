@@ -324,6 +324,28 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
           </View>
         </View>
 
+         <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionIcon}>🚚</Text>
+            <Text style={styles.sectionTitle}>Company Information</Text>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Company Name</Text>
+            <Text style={styles.fieldValue}>Van</Text>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>License Plate</Text>
+            <Text style={styles.fieldValue}>ABC-1234</Text>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Vehicle Model</Text>
+            <Text style={styles.fieldValue}>2022 Ford Transit</Text>
+          </View>
+        </View>
+
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionIcon}>🚚</Text>

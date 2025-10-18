@@ -43,16 +43,7 @@ export const fetchNotifications = createAsyncThunk(
     per_page?: number;
     page?: number;
   }) => {
-    console.log('🚀 REDUX - fetchNotifications thunk started');
-    console.log('📋 Parameters:', params);
-    
     const response = await notificationsService.getNotifications(params);
-    
-    console.log('📨 REDUX - Notifications service response:', {
-      success: response.success,
-      hasData: !!response.data,
-      message: response.message
-    });
     
     if (!response.success) {
       throw new Error(response.message || 'Failed to fetch notifications');
@@ -145,11 +136,6 @@ const notificationsSlice = createSlice({
         state.loading = false;
         state.error = null;
         
-        console.log('✅ REDUX - fetchNotifications fulfilled:', {
-          hasData: !!action.payload.data,
-          notificationCount: action.payload.data?.notifications?.length || 0
-        });
-        
         if (action.payload.data) {
           state.notifications = action.payload.data.notifications;
           state.counts = action.payload.data.counts;
@@ -232,9 +218,7 @@ export default notificationsSlice.reducer;
 // Selectors
 export const selectNotifications = (state: { notifications: NotificationsState }) => state.notifications.notifications;
 export const selectUnreadCount = (state: { notifications: NotificationsState }) => {
-  const count = state.notifications.counts.unread;
-  console.log('🔍 SELECTOR - selectUnreadCount called, returning:', count);
-  return count;
+  return state.notifications.counts.unread;
 };
 export const selectAllCount = (state: { notifications: NotificationsState }) => state.notifications.counts.all;
 export const selectNotificationsCounts = (state: { notifications: NotificationsState }) => state.notifications.counts;

@@ -114,7 +114,7 @@ export const fetchProfile = createAsyncThunk(
       // Get user data from auth state
       const state = getState() as any;
       const user = state.auth.user;
-      
+      console.log('*********User profile complete data ***************',user)
       console.log('📋 REDUX - Auth state user data:', {
         hasUser: !!user,
         userId: user?.id,

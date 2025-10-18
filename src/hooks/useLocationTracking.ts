@@ -31,31 +31,30 @@ export const useLocationTracking = () => {
     if (trackingRequiredTasks.length > 0 && !trackingStatus.isTracking) {
       // Start tracking with the first order that requires tracking
       const firstTask = trackingRequiredTasks[0];
-      console.log(`🚀 Auto-starting location tracking for order: ${firstTask.order_id}`);
+      console.log(`🚀 Starting location tracking for order: ${firstTask.order_id}`);
       
       const started = await locationTrackingService.startTracking(firstTask.order_id);
-      
-      if (started) {
-        console.log(`✅ Location tracking started successfully for order: ${firstTask.order_id}`);
-      }
     } else if (trackingRequiredTasks.length === 0 && trackingStatus.isTracking) {
-      // Stop tracking if no orders require location tracking
-      console.log('🛑 Auto-stopping location tracking - no orders requiring tracking');
-      locationTrackingService.stopTracking();
-      
-      console.log('✅ Location tracking stopped - no orders requiring tracking');
+      // Only stop tracking if no orders require tracking AND we have actual tasks loaded
+      // This prevents stopping during temporary task reloads
+      if (tasks && tasks.length > 0) {
+        console.log('🛑 No tracking-required tasks found - stopping location tracking');
+        locationTrackingService.stopTracking();
+      } else {
+        console.log('⏸️ Tasks not loaded yet - keeping location tracking active');
+      }
     } else if (trackingRequiredTasks.length > 0 && trackingStatus.isTracking) {
       // Check if we need to switch to a different order
       const currentlyTrackedOrder = trackingStatus.orderId;
       const isCurrentOrderStillRequiringTracking = trackingRequiredTasks.some(task => task.order_id === currentlyTrackedOrder);
       
       if (!isCurrentOrderStillRequiringTracking && trackingRequiredTasks.length > 0) {
-        console.log(`🔄 Switching tracking to new order: ${trackingRequiredTasks[0].order_id}`);
+        console.log(`🔄 Switching tracking from ${currentlyTrackedOrder} to ${trackingRequiredTasks[0].order_id}`);
         locationTrackingService.stopTracking();
         await locationTrackingService.startTracking(trackingRequiredTasks[0].order_id);
       }
     }
-  }, [getTrackingRequiredTasks]);
+  }, [getTrackingRequiredTasks, tasks]);
 
   /**
    * Handle manual start tracking
@@ -65,12 +64,6 @@ export const useLocationTracking = () => {
     
     const started = await locationTrackingService.startTracking(orderId);
     
-    if (started) {
-      console.log(`✅ Manual location tracking started for order: ${orderId}`);
-    } else {
-      console.log('❌ Failed to start location tracking - check permissions');
-    }
-    
     return started;
   }, []);
 
@@ -78,10 +71,7 @@ export const useLocationTracking = () => {
    * Handle manual stop tracking
    */
   const stopTracking = useCallback(() => {
-    console.log('🛑 Manually stopping location tracking');
     locationTrackingService.stopTracking();
-    
-    console.log('✅ Location tracking stopped successfully');
   }, []);
 
   /**
@@ -112,21 +102,16 @@ export const useLocationTracking = () => {
     return await locationTrackingService.requestLocationPermissions();
   }, []);
 
-  // Auto-start/stop tracking based on task status changes
+  // Auto-start/stop tracking based on task status changes (with debouncing to prevent stops during task reloads)
   useEffect(() => {
-    console.log('🔄 useLocationTracking: Tasks updated, checking tracking requirements...');
-    const trackingTasks = getTrackingRequiredTasks();
-    const currentStatus = locationTrackingService.getTrackingStatus();
-    
-    console.log('📊 Tracking Status Summary:', {
-      tasksRequiringTracking: trackingTasks.length,
-      taskIds: trackingTasks.map(t => t.order_id),
-      currentlyTracking: currentStatus.isTracking,
-      currentOrderId: currentStatus.orderId
-    });
-    
-    startTrackingIfNeeded();
-  }, [startTrackingIfNeeded, tasks, getTrackingRequiredTasks]);
+    // Add a small delay to avoid stopping tracking during rapid task updates (like during app state changes)
+    const timer = setTimeout(() => {
+      console.log('🔍 Checking if location tracking should be started/stopped...');
+      startTrackingIfNeeded();
+    }, 1000); // 1 second delay to allow tasks to stabilize
+
+    return () => clearTimeout(timer);
+  }, [startTrackingIfNeeded, tasks]);
 
   return {
     startTracking,

@@ -23,6 +23,7 @@ import VehicleInformationScreen from '../screens/VehicleInformationScreen';
 import OrderDetailsScreen from '../screens/OrderDetailsScreen';
 import TripProgressScreen from '../screens/TripProgressScreen';
 import ProofOfDeliveryScreen from '../screens/ProofOfDeliveryScreen';
+import LocationTestScreen from '../screens/LocationTestScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -223,6 +224,15 @@ const AppStackNavigator = () => {
         component={ProofOfDeliveryScreen}
         options={{
           presentation: 'card',
+        }}
+      />
+      <Stack.Screen 
+        name="LocationTest" 
+        component={LocationTestScreen}
+        options={{
+          presentation: 'card',
+          headerShown: true,
+          title: 'Location Test',
         }}
       />
     </Stack.Navigator>
