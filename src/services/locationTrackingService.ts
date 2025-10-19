@@ -548,7 +548,7 @@ class LocationTrackingService {
         if (this.gpsRetryCount < this.maxGpsRetries) {
           console.log(`🔄 Will retry GPS again (${this.gpsRetryCount + 1}/${this.maxGpsRetries}) in 3 seconds...`);
           setTimeout(() => {
-            if (this.isTracking && !this.useMockGeolocation) {
+            if (this.isTracking) {
               this.retryRealGPS();
             }
           }, 3000);
@@ -670,7 +670,7 @@ class LocationTrackingService {
           console.log('❌ Location tracking will not work without GPS access');
         } else {
           console.log(`🔄 Retrying GPS warmup in 5 seconds (attempt ${attempt + 1}/${this.maxGpsWarmupAttempts})...`);
-          await new Promise(resolve => setTimeout(resolve, 5000));
+          await new Promise<void>(resolve => setTimeout(resolve, 5000));
         }
       }
     }

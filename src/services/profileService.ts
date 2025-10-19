@@ -36,6 +36,12 @@ export interface DriverProfile {
   insurance_certificate: string | null;
   background_check: string | null;
   preferences: any[];
+  companyData?: {
+    company_name: string;
+    company_address: string;
+    phone: string;
+    company_email: string;
+  };
 }
 
 export interface ProfileResponse {
@@ -70,10 +76,11 @@ export interface ChangePasswordRequest {
 class ProfileService {
   async getProfile(): Promise<DriverProfile> {
     try {
-      console.log('🚀 PROFILE SERVICE - getProfile() started');
-      
+      console.log('🚀 PROFILE SERVICE - getProfile() started');      
       const response = await apiClient.getProfile();
-      
+
+     
+
       console.log('📋 PROFILE SERVICE - Raw API response:', {
         success: response.success,
         message: response.message,
@@ -86,19 +93,15 @@ class ProfileService {
       if (response.success && response.data) {
         // Handle different response structures
         const data = response.data as any;
-        const profile = data.driver || data;
-        
-        console.log('✅ PROFILE SERVICE - Profile data processed:', {
-          profileKeys: Object.keys(profile),
-          id: profile.id,
-          firstName: profile.first_name,
-          lastName: profile.last_name,
-          email: profile.email,
-          phone: profile.phone,
-          processedProfile: profile
-        });
-        
-        return profile;
+        let returnedProfile =  data.driver;
+        if (data.company) {
+          returnedProfile = {
+            ...returnedProfile,
+            companyData: data.company
+          };
+        }
+        console.log('response:', returnedProfile);
+        return returnedProfile;
       } else {
         console.error('❌ PROFILE SERVICE - Response indicates failure:', {
           success: response.success,

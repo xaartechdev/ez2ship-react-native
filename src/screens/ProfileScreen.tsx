@@ -76,7 +76,8 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
         license_back: reduxProfile.license_back || null,
         insurance_certificate: reduxProfile.insurance_certificate || null,
         background_check: reduxProfile.background_check || null,
-        preferences: reduxProfile.preferences || []
+        preferences: reduxProfile.preferences || [],
+        companyData: reduxProfile.companyData || null
       };
       
       setProfile(driverProfile);
@@ -332,17 +333,17 @@ const ProfileScreen: React.FC<NavigationProps> = ({ navigation }) => {
 
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>Company Name</Text>
-            <Text style={styles.fieldValue}>Van</Text>
+            <Text style={styles.fieldValue}>{profile.companyData?.company_name || 'N/A'}</Text>
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>License Plate</Text>
-            <Text style={styles.fieldValue}>ABC-1234</Text>
+            <Text style={styles.fieldLabel}>Company Email</Text>
+            <Text style={styles.fieldValue}>{profile.companyData?.company_email || 'N/A'}</Text>
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Vehicle Model</Text>
-            <Text style={styles.fieldValue}>2022 Ford Transit</Text>
+            <Text style={styles.fieldLabel}>Company Address</Text>
+            <Text style={styles.fieldValue}>{profile.companyData?.company_address || 'N/A'}</Text>
           </View>
         </View>
 

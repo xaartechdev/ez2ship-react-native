@@ -109,7 +109,9 @@ export const fetchProfile = createAsyncThunk(
   'profile/fetchProfile',
   async (_, { rejectWithValue, getState }) => {
     try {
-      console.log('🚀 REDUX - fetchProfile thunk started');
+      console.log('🚀 REDUXx - fetchProfile thunk started');
+       const { profileService } = await import('../../services/profileService');
+       const profile = await profileService.getProfile();
       
       // Get user data from auth state
       const state = getState() as any;
@@ -157,16 +159,12 @@ export const fetchProfile = createAsyncThunk(
           rating: user.rating || 0,
           total_trips: user.total_trips || 0,
           on_time_rate: user.on_time_rate || 0,
-          join_date: user.join_date || null
+          join_date: user.join_date || null,
+          companyData: profile.companyData || null,
         };
         
         console.log('✅ REDUX - Profile data constructed successfully:', {
-          profileKeys: Object.keys(profileData),
-          firstName: profileData.first_name,
-          lastName: profileData.last_name,
-          email: profileData.email,
-          driverId: profileData.driver_id,
-          constructedProfile: profileData
+          profileData
         });
         
         return profileData;
