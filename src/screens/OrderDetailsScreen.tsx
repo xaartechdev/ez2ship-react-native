@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {orderService} from '../services/orderService';
 import { launchImageLibrary, launchCamera, ImagePickerResponse, MediaType, CameraOptions, ImageLibraryOptions } from 'react-native-image-picker';
 import DocumentPicker from '@react-native-documents/picker';
+import TrackingStatus from '../components/TrackingStatus';
+import { useAutoLocationTracking } from '../hooks/useAutoLocationTracking';
 
 interface Task {
   id: number;
@@ -37,6 +39,7 @@ interface Task {
   payment_status: string;
   vehicle_type: string;
   histories: any[];
+  live_tracking_enabled?: boolean; // true or false
 }
 
 interface OrderDetailsScreenProps {
@@ -53,6 +56,12 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // Auto location tracking based on order status
+  useAutoLocationTracking({
+    orderId: task.order_id,
+    status: task.status,
+    live_tracking_enabled: task.live_tracking_enabled ? 1 : 0,
+  });
   // OTP and Proof of Delivery states
   const [otpCode, setOtpCode] = useState('');
   const [otpVerified, setOtpVerified] = useState(false);
@@ -558,6 +567,11 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
         </View>
       </View>
 
+      {/* Tracking Status - Show when order is in transit */}
+      {task.status === 'in_transit' && (
+        <TrackingStatus />
+      )}
+
       {/* Content */}
       <ScrollView style={styles.content}>
         {/* Show full order details for pending orders, simplified for others */}
@@ -579,14 +593,14 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
               </View>
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>Duration</Text>
-                <Text style={styles.detailValue}>35 min</Text>
+                <Text style={styles.detailValue}>35 mins</Text>
               </View>
             </View>
           </View>
         ) : (
           <View style={styles.simplifiedDetails}>
             <Text style={styles.simplifiedDistance}>{task?.distance?.toFixed(1)} miles</Text>
-            <Text style={styles.simplifiedDuration}>35 min</Text>
+            <Text style={styles.simplifiedDuration}>35 mins</Text>
           </View>
         )}
 

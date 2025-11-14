@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,221 +7,143 @@ import {
   ScrollView,
   Alert,
   Platform,
-  AppState
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { locationTrackingService } from '../services/locationTrackingService';
+import SimpleLocationService from '../services/SimpleLocationService';
 
 const LocationTestScreen: React.FC = () => {
   const [testResult, setTestResult] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isTrackingActive, setIsTrackingActive] = useState(false);
-  const [appState, setAppState] = useState(AppState.currentState);
-  const [backgroundTestLog, setBackgroundTestLog] = useState<string>('');
+  const locationService = SimpleLocationService.getInstance();
 
-  const runLocationTest = async () => {
-    setIsLoading(true);
-    setTestResult('🧪 Testing location access...\n');
-    
-    try {
-      const result = await locationTrackingService.testLocationAccess();
-      
-      let resultText = `=== LOCATION TEST RESULTS ===\n`;
-      resultText += `Platform: ${Platform.OS}\n`;
-      resultText += `Status: ${result.success ? '✅ SUCCESS' : '❌ FAILED'}\n`;
-      resultText += `Message: ${result.message}\n`;
-      
-      if (result.data) {
-        if (result.success && result.data.latitude) {
-          resultText += `\nLocation Data:\n`;
-          resultText += `• Latitude: ${result.data.latitude}\n`;
-          resultText += `• Longitude: ${result.data.longitude}\n`;
-          resultText += `• Accuracy: ${result.data.accuracy}m\n`;
-          resultText += `• Timestamp: ${result.data.timestamp}\n`;
-        } else {
-          resultText += `\nError Details:\n`;
-          resultText += JSON.stringify(result.data, null, 2);
-        }
-      }
-      
-      setTestResult(resultText);
-      
-      if (result.success) {
-        Alert.alert('Location Test Successful!', 'GPS is working correctly on this device.');
-      } else {
-        Alert.alert('Location Test Failed', result.message);
-      }
-      
-    } catch (error) {
-      const errorText = `❌ TEST EXCEPTION:\n${error instanceof Error ? error.message : String(error)}`;
-      setTestResult(errorText);
-      Alert.alert('Test Error', errorText);
-    }
-    
-    setIsLoading(false);
-  };
-
-  const clearResults = () => {
+  const clearLog = () => {
     setTestResult('');
-    setBackgroundTestLog('');
   };
 
-  const startBackgroundTest = async () => {
+  const testGetLocation = async () => {
+    setIsLoading(true);
+    setTestResult('📍 Getting current location...\n');
+
     try {
-      setBackgroundTestLog('🔄 Starting background location test...\n');
-      
-      const started = await locationTrackingService.startTracking('TEST-BG-001');
-      
-      if (started) {
-        setIsTrackingActive(true);
-        setBackgroundTestLog(prev => prev + '✅ Background tracking started\n');
-        setBackgroundTestLog(prev => prev + '📱 Now minimize the app to test background location...\n');
-        setBackgroundTestLog(prev => prev + '⏰ Test will run for 2 minutes\n\n');
-        
-        // Set up monitoring
-        const startTime = Date.now();
-        const monitorInterval = setInterval(() => {
-          const status = locationTrackingService.getTrackingStatus();
-          const elapsed = Math.round((Date.now() - startTime) / 1000);
-          
-          setBackgroundTestLog(prev => {
-            const lines = prev.split('\n');
-            const fixedLines = lines.slice(0, 4); // Keep first 4 lines
-            const newStatus = `📊 Status (${elapsed}s): ${status.isTracking ? '🟢 Active' : '🔴 Stopped'}`;
-            const lastLocation = status.lastLocation ? 
-              `📍 Last: ${status.lastLocation.latitude.toFixed(6)}, ${status.lastLocation.longitude.toFixed(6)}` : 
-              '📍 No location yet';
-            return [...fixedLines, newStatus, lastLocation, ''].join('\n');
-          });
-          
-          // Stop after 2 minutes
-          if (elapsed > 120) {
-            clearInterval(monitorInterval);
-            stopBackgroundTest();
-          }
-        }, 5000);
-        
+      const location = await locationService.getCurrentLocation();
+      if (location) {
+        setTestResult(prev => prev + `
+✅ Location found!
+📍 Latitude: ${location.latitude}
+📍 Longitude: ${location.longitude}
+`);
+        Alert.alert('Success', `Location: ${location.latitude}, ${location.longitude}`);
       } else {
-        setBackgroundTestLog(prev => prev + '❌ Failed to start background tracking\n');
+        setTestResult(prev => prev + '❌ Failed to get location\n');
+        Alert.alert('Error', 'Failed to get location');
       }
     } catch (error) {
-      setBackgroundTestLog(prev => prev + `❌ Error: ${error}\n`);
+      setTestResult(prev => prev + `❌ Error: ${error}\n`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const stopBackgroundTest = () => {
-    locationTrackingService.stopTracking();
-    setIsTrackingActive(false);
-    setBackgroundTestLog(prev => prev + '\n🛑 Background test stopped\n');
+  const testSendToAPI = async () => {
+    setIsLoading(true);
+    setTestResult(prev => prev + '🧪 Testing API sending...\n');
+
+    try {
+      await locationService.testService();
+      setTestResult(prev => prev + '✅ API test completed (check logs)\n');
+    } catch (error) {
+      setTestResult(prev => prev + `❌ API test error: ${error}\n`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      setAppState(nextAppState);
-      
-      if (isTrackingActive) {
-        const timestamp = new Date().toLocaleTimeString();
-        setBackgroundTestLog(prev => 
-          prev + `📱 App state: ${nextAppState} (${timestamp})\n`
-        );
-      }
-    });
+  const startTracking = async () => {
+    setIsLoading(true);
+    setTestResult(prev => prev + '🚀 Starting location tracking...\n');
 
-    return () => subscription?.remove();
-  }, [isTrackingActive]);
+    try {
+      await locationService.startTracking();
+      setTestResult(prev => prev + '✅ Location tracking started\n');
+      Alert.alert('Success', 'Location tracking started');
+    } catch (error) {
+      setTestResult(prev => prev + `❌ Tracking start error: ${error}\n`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const stopTracking = () => {
+    locationService.stopTracking();
+    setTestResult(prev => prev + '🛑 Location tracking stopped\n');
+    Alert.alert('Info', 'Location tracking stopped');
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Location Debug Tool</Text>
-          <Text style={styles.subtitle}>Test GPS functionality on real device</Text>
-        </View>
+      <View style={styles.header}>
+        <Text style={styles.title}>Simple Location Test</Text>
+        <Text style={styles.subtitle}>Clean & Simple Location Service</Text>
+      </View>
 
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={[styles.button, styles.testButton]} 
-            onPress={runLocationTest}
-            disabled={isLoading}
-          >
-            <Text style={styles.buttonText}>
-              {isLoading ? '🧪 Testing...' : '🧪 Test Location Access'}
-            </Text>
-          </TouchableOpacity>
+      <ScrollView style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[styles.button, styles.primaryButton]}
+          onPress={testGetLocation}
+          disabled={isLoading}
+        >
+          <Text style={styles.primaryButtonText}>
+            {isLoading ? '📍 Getting Location...' : '📍 Get Current Location'}
+          </Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.button, isTrackingActive ? styles.stopButton : styles.backgroundButton]} 
-            onPress={isTrackingActive ? stopBackgroundTest : startBackgroundTest}
-            disabled={isLoading}
-          >
-            <Text style={styles.buttonText}>
-              {isTrackingActive ? '🛑 Stop Background Test' : '🌙 Test Background Tracking'}
-            </Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.secondaryButton]}
+          onPress={testSendToAPI}
+          disabled={isLoading}
+        >
+          <Text style={styles.secondaryButtonText}>
+            🧪 Test API Sending
+          </Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.button, styles.clearButton]} 
-            onPress={clearResults}
-          >
-            <Text style={styles.buttonText}>🗑️ Clear Results</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[styles.button, styles.successButton]}
+          onPress={startTracking}
+          disabled={isLoading}
+        >
+          <Text style={styles.successButtonText}>
+            🚀 Start Tracking
+          </Text>
+        </TouchableOpacity>
 
-        {/* App State Indicator */}
-        <View style={styles.appStateContainer}>
-          <Text style={styles.appStateText}>
-            📱 App State: <Text style={[styles.appStateValue, appState === 'background' ? styles.backgroundState : styles.foregroundState]}>
-              {appState}
-            </Text>
+        <TouchableOpacity
+          style={[styles.button, styles.warningButton]}
+          onPress={stopTracking}
+        >
+          <Text style={styles.warningButtonText}>
+            🛑 Stop Tracking
           </Text>
-        </View>
+        </TouchableOpacity>
 
-        {testResult !== '' && (
-          <View style={styles.resultsContainer}>
-            <Text style={styles.resultsTitle}>Location Test Results:</Text>
-            <Text style={styles.resultsText}>{testResult}</Text>
-          </View>
-        )}
-
-        {backgroundTestLog !== '' && (
-          <View style={styles.resultsContainer}>
-            <Text style={styles.resultsTitle}>Background Test Log:</Text>
-            <Text style={styles.resultsText}>{backgroundTestLog}</Text>
-          </View>
-        )}
-
-        <View style={styles.instructionsContainer}>
-          <Text style={styles.instructionsTitle}>How to Test Background Location:</Text>
-          <Text style={styles.instructionText}>
-            1. Tap "🌙 Test Background Tracking" to start
+        <TouchableOpacity
+          style={[styles.button, styles.clearButton]}
+          onPress={clearLog}
+        >
+          <Text style={styles.clearButtonText}>
+            🗑️ Clear Log
           </Text>
-          <Text style={styles.instructionText}>
-            2. Minimize the app (press home button)
-          </Text>
-          <Text style={styles.instructionText}>
-            3. Wait 1-2 minutes, then return to app
-          </Text>
-          <Text style={styles.instructionText}>
-            4. Check if locations were tracked in background
-          </Text>
-        </View>
-
-        <View style={styles.instructionsContainer}>
-          <Text style={styles.instructionsTitle}>Troubleshooting Tips:</Text>
-          <Text style={styles.instructionText}>
-            1. Enable Location Services in device settings
-          </Text>
-          <Text style={styles.instructionText}>
-            2. Grant Location permission to Ez2ship app
-          </Text>
-          <Text style={styles.instructionText}>
-            3. For background: Allow "All the time" location access
-          </Text>
-          <Text style={styles.instructionText}>
-            4. Test outdoors or near a window for better GPS signal
-          </Text>
-        </View>
+        </TouchableOpacity>
       </ScrollView>
+
+      <View style={styles.logContainer}>
+        <Text style={styles.logTitle}>Test Log:</Text>
+        <ScrollView style={styles.logScroll}>
+          <Text style={styles.logText}>
+            {testResult || 'Ready to test location service...\n\n• Get Current Location: Test getting GPS coordinates\n• Test API Sending: Get location and send to API\n• Start Tracking: Begin continuous location tracking\n• Stop Tracking: Stop location tracking'}
+          </Text>
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
@@ -231,110 +153,91 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  scrollView: {
-    flex: 1,
-    padding: 20,
-  },
   header: {
+    backgroundColor: '#007AFF',
+    padding: 20,
     alignItems: 'center',
-    marginBottom: 30,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: 'white',
     marginBottom: 5,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   buttonContainer: {
-    marginBottom: 20,
+    padding: 20,
+    maxHeight: 300,
   },
   button: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
+    padding: 15,
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 10,
   },
-  testButton: {
+  primaryButton: {
     backgroundColor: '#007AFF',
   },
-  clearButton: {
-    backgroundColor: '#FF3B30',
+  primaryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
-  backgroundButton: {
-    backgroundColor: '#5856D6',
+  secondaryButton: {
+    backgroundColor: '#34C759',
   },
-  stopButton: {
+  secondaryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  successButton: {
     backgroundColor: '#FF9500',
   },
-  appStateContainer: {
-    backgroundColor: '#f8f9fa',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  appStateText: {
-    fontSize: 14,
-    color: '#333',
-    textAlign: 'center',
-  },
-  appStateValue: {
+  successButtonText: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
   },
-  backgroundState: {
-    color: '#FF3B30',
+  warningButton: {
+    backgroundColor: '#FF3B30',
   },
-  foregroundState: {
-    color: '#34C759',
-  },
-  buttonText: {
-    color: '#fff',
+  warningButtonText: {
+    color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
-  resultsContainer: {
-    backgroundColor: '#fff',
-    padding: 15,
+  clearButton: {
+    backgroundColor: '#8E8E93',
+  },
+  clearButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  logContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+    margin: 20,
     borderRadius: 10,
-    marginBottom: 20,
+    padding: 15,
   },
-  resultsTitle: {
+  logTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 10,
-  },
-  resultsText: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 12,
     color: '#333',
-    lineHeight: 18,
   },
-  instructionsContainer: {
-    backgroundColor: '#e8f4fd',
-    padding: 15,
-    borderRadius: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
+  logScroll: {
+    flex: 1,
   },
-  instructionsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    marginBottom: 10,
-  },
-  instructionText: {
+  logText: {
     fontSize: 14,
     color: '#333',
-    marginBottom: 5,
-    paddingLeft: 10,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
 });
 

@@ -16,15 +16,7 @@ import { loadUserFromStorage } from './src/store/slices/authSlice';
 import AppNavigator from './src/navigation/RootNavigator';
 import { ErrorBoundary } from './src/components/common';
 import AppLoadingScreen from './src/screens/AppLoadingScreen';
-import { useLocationTracking } from './src/hooks/useLocationTracking';
 
-// Component that uses location tracking hook inside Redux context
-const AppWithLocationTracking: React.FC = () => {
-  // Initialize location tracking at app level for continuous operation
-  useLocationTracking();
-  
-  return <AppNavigator />;
-};
 
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
@@ -93,7 +85,7 @@ function App(): React.JSX.Element {
             barStyle={isDarkMode ? 'light-content' : 'dark-content'}
             backgroundColor="#ffffff"
           />
-          <AppWithLocationTracking />
+          <AppNavigator />
         </SafeAreaProvider>
       </ErrorBoundary>
     </Provider>
