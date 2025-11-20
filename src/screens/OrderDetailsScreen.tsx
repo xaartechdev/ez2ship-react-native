@@ -58,7 +58,7 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
   
   // Auto location tracking based on order status
   useAutoLocationTracking({
-    orderId: task.order_id,
+    orderId: task.id.toString(), // Use id field for API, not order_id
     status: task.status,
     live_tracking_enabled: task.live_tracking_enabled ? 1 : 0,
   });

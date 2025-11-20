@@ -16,6 +16,7 @@ import { loadUserFromStorage } from './src/store/slices/authSlice';
 import AppNavigator from './src/navigation/RootNavigator';
 import { ErrorBoundary } from './src/components/common';
 import AppLoadingScreen from './src/screens/AppLoadingScreen';
+import GlobalLocationTracker from './src/components/GlobalLocationTracker';
 
 
 function App(): React.JSX.Element {
@@ -85,6 +86,7 @@ function App(): React.JSX.Element {
             barStyle={isDarkMode ? 'light-content' : 'dark-content'}
             backgroundColor="#ffffff"
           />
+          <GlobalLocationTracker />
           <AppNavigator />
         </SafeAreaProvider>
       </ErrorBoundary>

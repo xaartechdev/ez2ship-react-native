@@ -95,24 +95,28 @@ export const useAutoLocationTracking = (config: TrackingConfig) => {
 
   const sendLocationToAPI = async () => {
     try {
-      console.log('📍 Fetching current location...');
+      console.log(`📍 Fetching current location for order ID: ${config.orderId}`);
       const location = await locationService.getCurrentLocation();
       if (location) {
         console.log(`📍 Got location: ${location.latitude}, ${location.longitude}`);
+        console.log(`📤 Sending location to API for order ID: ${config.orderId}`);
+        
         const success = await locationService.sendLocationToAPI(
           location.latitude,
-          location.longitude
+          location.longitude,
+          config.orderId
         );
+        
         if (!success) {
-          console.warn('⚠️ Failed to send location to API');
+          console.warn(`⚠️ Failed to send location to API for order ${config.orderId}`);
         } else {
-          console.log('✅ Location successfully sent to API');
+          console.log(`✅ Location successfully sent to API for order ${config.orderId}`);
         }
       } else {
-        console.warn('⚠️ Could not get current location');
+        console.warn(`⚠️ Could not get current location for order ${config.orderId}`);
       }
     } catch (error) {
-      console.error('❌ Error sending location:', error);
+      console.error(`❌ Error sending location for order ${config.orderId}:`, error);
     }
   };
 

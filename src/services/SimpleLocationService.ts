@@ -1,6 +1,6 @@
 /**
  * Simple Location Service
- * Clean, minimal implementation for sending location to API
+ * Clean, minimal implementation for sending location to API with order tracking
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from 'react-native-geolocation-service';
@@ -10,6 +10,11 @@ class SimpleLocationService {
   private static instance: SimpleLocationService;
   private isTracking = false;
   private watchId: number | null = null;
+  private currentOrderId: string | null = null;
+  private trackingIntervalId: any = null;
+  private lastLocation: { latitude: number; longitude: number; timestamp: number } | null = null;
+  private MIN_ACCURACY = 50; // Minimum accuracy in meters
+  private MIN_DISTANCE = 5; // Minimum distance in meters to consider as movement
 
   static getInstance(): SimpleLocationService {
     if (!SimpleLocationService.instance) {
@@ -40,16 +45,21 @@ class SimpleLocationService {
   }
 
   /**
-   * Get current location once
+   * Get current location once with enhanced accuracy
    */
-  async getCurrentLocation(): Promise<{ latitude: number; longitude: number } | null> {
+  async getCurrentLocation(): Promise<{ latitude: number; longitude: number; accuracy?: number } | null> {
     return new Promise((resolve) => {
       Geolocation.getCurrentPosition(
         (position) => {
-          resolve({
+          const location = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
-          });
+            accuracy: position.coords.accuracy,
+          };
+          
+          console.log(`📍 Raw GPS data: Lat ${location.latitude}, Lng ${location.longitude}, Accuracy: ${location.accuracy}m`);
+          
+          resolve(location);
         },
         (error) => {
           console.error('Location error:', error);
@@ -57,37 +67,128 @@ class SimpleLocationService {
         },
         {
           enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 10000,
+          timeout: 20000, // Increased timeout
+          maximumAge: 5000, // Reduced max age for fresher location
+          distanceFilter: 0, // Get all location updates
         }
       );
     });
   }
 
   /**
-   * Send location to API
+   * Check if location is accurate enough and different from last location
    */
-  async sendLocationToAPI(latitude: number, longitude: number): Promise<boolean> {
+  private isLocationValid(newLocation: { latitude: number; longitude: number; accuracy?: number }): boolean {
+    // Check accuracy
+    if (newLocation.accuracy && newLocation.accuracy > this.MIN_ACCURACY) {
+      console.log(`⚠️ Location accuracy too low: ${newLocation.accuracy}m (min: ${this.MIN_ACCURACY}m)`);
+      return false;
+    }
+
+    // Check distance from last location
+    if (this.lastLocation) {
+      const distance = this.calculateDistance(
+        this.lastLocation.latitude,
+        this.lastLocation.longitude,
+        newLocation.latitude,
+        newLocation.longitude
+      );
+
+      if (distance < this.MIN_DISTANCE) {
+        console.log(`📍 Location change too small: ${distance}m (min: ${this.MIN_DISTANCE}m)`);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Calculate distance between two coordinates in meters
+   */
+  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c;
+  }
+
+  /**
+   * Send location to API with order_id
+   */
+  async sendLocationToAPI(latitude: number, longitude: number, orderId?: string): Promise<boolean> {
     try {
       const authToken = await AsyncStorage.getItem('auth_token');
+      const orderIdToSend = orderId || this.currentOrderId;
+      
+      if (!orderIdToSend) {
+        console.warn('⚠️ No order ID available for location tracking');
+        return false;
+      }
+
+      // Update last location
+      this.lastLocation = {
+        latitude,
+        longitude,
+        timestamp: Date.now()
+      };
+
+      const payload = {
+        order_id: parseInt(orderIdToSend),
+        latitude: parseFloat(latitude.toFixed(7)), // Round to ~1cm precision
+        longitude: parseFloat(longitude.toFixed(7)),
+      };
+      
+      console.log('📤 API Request Details:', {
+        url: 'https://devez2ship.xaartech.com/api/driver/tracking/update-location',
+        method: 'POST',
+        payload,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authToken ? `Bearer ${authToken.substring(0, 10)}...` : 'No token'
+        }
+      });
+
       const response = await fetch('https://devez2ship.xaartech.com/api/driver/tracking/update-location', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
         },
-        body: JSON.stringify({
-          latitude,
-          longitude,
-          timestamp: new Date().toISOString(),
-        }),
+        body: JSON.stringify(payload),
       });
 
       const success = response.ok;
-      console.log(`📍 Location sent to API: ${success ? 'SUCCESS' : 'FAILED'}`);
+      const responseData = await response.text();
+      
+      console.log('📥 API Response Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        success,
+        responseData: responseData ? (responseData.length > 200 ? responseData.substring(0, 200) + '...' : responseData) : 'No response data'
+      });
       
       if (success) {
-        const data = await response.json();
-        console.log('API Response:', data);
+        try {
+          const jsonData = JSON.parse(responseData);
+          console.log('✅ Location API Success:', jsonData);
+        } catch (e) {
+          console.log('✅ Location API Success (non-JSON response)');
+        }
+      } else {
+        console.error('❌ Location API Failed:', {
+          status: response.status,
+          response: responseData
+        });
       }
       
       return success;
@@ -98,12 +199,17 @@ class SimpleLocationService {
   }
 
   /**
-   * Start continuous location tracking
+   * Start location tracking for a specific order
    */
-  async startTracking(): Promise<void> {
-    if (this.isTracking) {
-      console.log('⚠️ Already tracking location');
+  async startTrackingForOrder(orderId: string): Promise<void> {
+    if (this.isTracking && this.currentOrderId === orderId) {
+      console.log(`⚠️ Already tracking for order ${orderId}`);
       return;
+    }
+
+    // Stop any existing tracking
+    if (this.isTracking) {
+      this.stopTracking();
     }
 
     const hasPermission = await this.requestPermissions();
@@ -112,27 +218,42 @@ class SimpleLocationService {
       return;
     }
 
-    console.log('🚀 Starting location tracking...');
+    console.log(`🚀 Starting location tracking for order ${orderId}...`);
     this.isTracking = true;
+    this.currentOrderId = orderId;
 
-    this.watchId = Geolocation.watchPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        console.log(`📍 Location update: ${latitude}, ${longitude}`);
-        
-        // Send to API
-        this.sendLocationToAPI(latitude, longitude);
-      },
-      (error) => {
-        console.error('❌ Location tracking error:', error);
-      },
-      {
-        enableHighAccuracy: true,
-        interval: 30000, // Update every 30 seconds
-        fastestInterval: 10000, // Fastest update every 10 seconds
-        distanceFilter: 10, // Update when moved at least 10 meters
+    // Send initial location
+    const initialLocation = await this.getCurrentLocation();
+    if (initialLocation) {
+      await this.sendLocationToAPI(initialLocation.latitude, initialLocation.longitude, orderId);
+    }
+
+    // Set up interval tracking (every 5 seconds)
+    this.trackingIntervalId = setInterval(async () => {
+      const location = await this.getCurrentLocation();
+      if (location) {
+        // Check if location is accurate and significantly different
+        if (this.isLocationValid(location)) {
+          console.log(`✅ Location passed validation, sending to API`);
+          await this.sendLocationToAPI(location.latitude, location.longitude, orderId);
+        } else {
+          console.log(`⚠️ Location filtered out due to poor accuracy or minimal movement`);
+        }
       }
-    );
+    }, 5000);
+
+    console.log('✅ Location tracking started with 5-second intervals');
+  }
+
+  /**
+   * Start continuous location tracking (legacy method)
+   */
+  async startTracking(): Promise<void> {
+    if (!this.currentOrderId) {
+      console.warn('⚠️ No current order ID set for tracking');
+      return;
+    }
+    await this.startTrackingForOrder(this.currentOrderId);
   }
 
   /**
@@ -144,26 +265,82 @@ class SimpleLocationService {
       return;
     }
 
-    console.log('🛑 Stopping location tracking...');
+    console.log(`🛑 Stopping location tracking for order ${this.currentOrderId}...`);
     
     if (this.watchId !== null) {
       Geolocation.clearWatch(this.watchId);
       this.watchId = null;
     }
+
+    if (this.trackingIntervalId !== null) {
+      clearInterval(this.trackingIntervalId);
+      this.trackingIntervalId = null;
+    }
     
     this.isTracking = false;
+    this.currentOrderId = null;
+    this.lastLocation = null;
+    console.log('✅ Location tracking stopped');
+  }
+
+  /**
+   * Set current order ID for tracking
+   */
+  setCurrentOrder(orderId: string): void {
+    this.currentOrderId = orderId;
+  }
+
+  /**
+   * Get current order ID
+   */
+  getCurrentOrderId(): string | null {
+    return this.currentOrderId;
+  }
+
+  /**
+   * Get tracking status
+   */
+  getTrackingStatus(): { isTracking: boolean; orderId: string | null } {
+    return {
+      isTracking: this.isTracking,
+      orderId: this.currentOrderId
+    };
+  }
+
+  /**
+   * Adjust tracking precision settings
+   */
+  setTrackingPrecision(mode: 'high' | 'balanced' | 'low'): void {
+    switch (mode) {
+      case 'high':
+        this.MIN_ACCURACY = 20; // 20 meters
+        this.MIN_DISTANCE = 3;  // 3 meters
+        console.log('🎯 High precision mode: MIN_ACCURACY=20m, MIN_DISTANCE=3m');
+        break;
+      case 'balanced':
+        this.MIN_ACCURACY = 50; // 50 meters
+        this.MIN_DISTANCE = 5;  // 5 meters
+        console.log('⚖️ Balanced mode: MIN_ACCURACY=50m, MIN_DISTANCE=5m');
+        break;
+      case 'low':
+        this.MIN_ACCURACY = 100; // 100 meters
+        this.MIN_DISTANCE = 10;  // 10 meters
+        console.log('🔋 Battery saving mode: MIN_ACCURACY=100m, MIN_DISTANCE=10m');
+        break;
+    }
   }
 
   /**
    * Test the service by getting location once and sending to API
    */
-  async testService(): Promise<void> {
+  async testService(orderId?: string): Promise<void> {
     console.log('🧪 Testing Simple Location Service...');
     
     const location = await this.getCurrentLocation();
     if (location) {
       console.log(`📍 Got location: ${location.latitude}, ${location.longitude}`);
-      await this.sendLocationToAPI(location.latitude, location.longitude);
+      const testOrderId = orderId || this.currentOrderId || 'test-order';
+      await this.sendLocationToAPI(location.latitude, location.longitude, testOrderId);
     } else {
       console.log('❌ Failed to get location');
     }

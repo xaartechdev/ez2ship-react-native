@@ -27,6 +27,7 @@ export interface Task {
   can_accept: boolean;
   can_reject: boolean;
   can_update_status: boolean;
+  live_tracking_enabled?: boolean | number; // Flag to enable location tracking
   // Keep the original customer structure for backward compatibility
   customer: {
     id: number;
