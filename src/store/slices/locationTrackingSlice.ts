@@ -2,7 +2,7 @@
  * Location Tracking Slice
  * Manages active order IDs that are being location tracked
  */
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction, createSelector } from '@reduxjs/toolkit';
 
 export interface ActiveOrder {
   orderId: string;
@@ -68,6 +68,14 @@ const locationTrackingSlice = createSlice({
       state.activeOrders = [];
     },
     
+    clearAllActiveOrders: (state) => {
+      const clearedCount = state.activeOrders.length;
+      console.log(`📍 Force clearing ALL active orders from tracking (${clearedCount} orders) - typically on logout`);
+      state.activeOrders = [];
+      state.isGlobalTrackingEnabled = false;
+      state.lastLocationUpdate = null;
+    },
+    
     setGlobalTrackingEnabled: (state, action: PayloadAction<boolean>) => {
       state.isGlobalTrackingEnabled = action.payload;
       console.log(`📍 Global tracking enabled: ${action.payload}`);
@@ -96,6 +104,7 @@ export const {
   removeActiveOrder,
   updateOrderStatus,
   clearActiveOrders,
+  clearAllActiveOrders,
   setGlobalTrackingEnabled,
   updateLastLocationUpdate,
   cleanupCompletedOrders,
@@ -103,13 +112,30 @@ export const {
 
 export default locationTrackingSlice.reducer;
 
-// Selectors
-export const selectActiveOrders = (state: { locationTracking: LocationTrackingState }) => state.locationTracking.activeOrders;
-export const selectActiveOrderIds = (state: { locationTracking: LocationTrackingState }) => 
-  state.locationTracking.activeOrders.map(order => order.orderId);
-export const selectIsGlobalTrackingEnabled = (state: { locationTracking: LocationTrackingState }) => 
-  state.locationTracking.isGlobalTrackingEnabled;
-export const selectLastLocationUpdate = (state: { locationTracking: LocationTrackingState }) => 
-  state.locationTracking.lastLocationUpdate;
-export const selectActiveOrderCount = (state: { locationTracking: LocationTrackingState }) => 
-  state.locationTracking.activeOrders.length;
+// Properly memoized selectors to prevent unnecessary re-renders
+const selectLocationTrackingState = (state: { locationTracking: LocationTrackingState }) => state.locationTracking;
+
+export const selectActiveOrders = createSelector(
+  [selectLocationTrackingState],
+  (locationTracking) => locationTracking.activeOrders
+);
+
+export const selectActiveOrderIds = createSelector(
+  [selectActiveOrders],
+  (activeOrders) => activeOrders.map(order => order.orderId)
+);
+
+export const selectIsGlobalTrackingEnabled = createSelector(
+  [selectLocationTrackingState],
+  (locationTracking) => locationTracking.isGlobalTrackingEnabled
+);
+
+export const selectLastLocationUpdate = createSelector(
+  [selectLocationTrackingState],
+  (locationTracking) => locationTracking.lastLocationUpdate
+);
+
+export const selectActiveOrderCount = createSelector(
+  [selectActiveOrders],
+  (activeOrders) => activeOrders.length
+);

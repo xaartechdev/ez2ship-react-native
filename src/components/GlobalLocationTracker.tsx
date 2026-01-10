@@ -14,6 +14,8 @@ import {
   cleanupCompletedOrders,
   selectActiveOrders 
 } from '../store/slices/locationTrackingSlice';
+import { fetchTasksForLocationTracking } from '../store/slices/tasksSlice';
+import GlobalAutoLocationTracker from './GlobalAutoLocationTracker';
 
 const GlobalLocationTracker: React.FC = () => {
   const dispatch = useDispatch();
@@ -29,12 +31,43 @@ const GlobalLocationTracker: React.FC = () => {
   // Get all tasks from Redux store
   const tasks = useSelector((state: RootState) => state.tasks?.tasks || []);
   const activeTrackingOrders = useSelector(selectActiveOrders);
+  const isLoading = useSelector((state: RootState) => state.tasks?.isLoading || false);
+  
+  // Get cached tasks by status for complete tracking state
+  const pendingTasks = useSelector((state: RootState) => state.tasks?.pendingTasks || []);
+  const inProgressTasks = useSelector((state: RootState) => state.tasks?.inProgressTasks || []);
+  const completedTasks = useSelector((state: RootState) => state.tasks?.completedTasks || []);
+  
+  // Combine all tasks to ensure we don't lose tracking when switching screens
+  const allTasks = [...tasks, ...pendingTasks, ...inProgressTasks, ...completedTasks].filter((task, index, array) => 
+    // Remove duplicates by id
+    array.findIndex(t => t.id === task.id) === index
+  );
+
+  // Check if we need to fetch background data for location tracking
+  useEffect(() => {
+    // Only fetch if we don't have in-progress tasks cached and we're not currently loading
+    const hasInProgressTasks = inProgressTasks.length > 0;
+    
+    if (!hasInProgressTasks && !isLoading) {
+      console.log('🔄 No in-progress tasks cached - fetching for location tracking...');
+      dispatch(fetchTasksForLocationTracking('in_progress'));
+    }
+  }, []); // Only run once on mount
+
+  console.log('📋 GlobalLocationTracker: Task sources', {
+    currentScreenTasks: tasks.length,
+    pendingTasks: pendingTasks.length,
+    inProgressTasks: inProgressTasks.length,
+    allTasks: allTasks.length,
+    timestamp: new Date().toISOString()
+  });
 
   useEffect(() => {
-    // Find all orders that should be tracked
+    // Find all orders that should be tracked using ALL available tasks
     const trackingStatuses = ['in_progress', 'picked_up', 'in_transit'];
     
-    const ordersRequiringTracking = tasks.filter(task => {
+    const ordersRequiringTracking = allTasks.filter(task => {
       const hasTrackingStatus = trackingStatuses.includes(task.status);
       const hasLiveTracking = task.live_tracking_enabled === true || task.live_tracking_enabled === 1;
       return hasTrackingStatus && hasLiveTracking;
@@ -56,12 +89,14 @@ const GlobalLocationTracker: React.FC = () => {
     }
 
     console.log('🌍 GlobalLocationTracker: Detected tracking changes', {
-      totalTasks: tasks.length,
+      totalAllTasks: allTasks.length,
+      currentScreenTasks: tasks.length,
       ordersRequiringTracking: ordersRequiringTracking.length,
       currentlyTracked: activeTrackingOrders.length,
       requiredTrackingIds,
       currentTrackingIds,
-      previousRequiredIds
+      previousRequiredIds,
+      isScreenSwitch: tasks.length === 0 && allTasks.length > 0
     });
 
     // Update the ref with current required IDs
@@ -82,15 +117,33 @@ const GlobalLocationTracker: React.FC = () => {
       }
     });
 
-    // Remove orders that are being tracked but no longer need it
-    currentTrackingIds.forEach(orderId => {
-      if (!requiredTrackingIds.includes(orderId)) {
-        console.log(`🛑 Removing order ${orderId} from location tracking`);
-        dispatch(removeActiveOrder(orderId));
+    // CRITICAL FIX: Don't remove orders just because they're not in current screen
+    // Only remove orders that are actually completed/cancelled, not when switching screens
+    const ordersToRemove = currentTrackingIds.filter(orderId => {
+      const task = allTasks.find(t => t.id.toString() === orderId);
+      if (!task) {
+        // Task not found in any task list - keep tracking for now
+        console.log(`⚠️ Order ${orderId} not found in any task list - keeping tracking for now`);
+        return false;
       }
+      
+      // Only remove if task status indicates it's truly finished
+      const completedStatuses = ['completed', 'delivered', 'cancelled', 'failed'];
+      const shouldRemove = completedStatuses.includes(task.status) || !task.live_tracking_enabled;
+      
+      if (shouldRemove) {
+        console.log(`🛑 Removing order ${orderId} from tracking - Status: ${task.status}, Live tracking: ${task.live_tracking_enabled}`);
+      }
+      
+      return shouldRemove;
     });
 
-  }, [tasks, activeTrackingOrders, dispatch]); // Keep original dependencies but use ref to prevent unnecessary dispatches
+    // Remove only truly completed orders
+    ordersToRemove.forEach(orderId => {
+      dispatch(removeActiveOrder(orderId));
+    });
+
+  }, [tasks, activeTrackingOrders, pendingTasks, inProgressTasks, dispatch]); // Include cached tasks to trigger when background fetch completes
 
   // Cleanup on unmount
   useEffect(() => {
@@ -117,8 +170,8 @@ const GlobalLocationTracker: React.FC = () => {
     return () => clearInterval(statusInterval);
   }, [tasks, locationService]);
 
-  // This component doesn't render anything
-  return null;
+  // This component doesn't render anything visible, but includes the auto-tracker
+  return <GlobalAutoLocationTracker />;
 };
 
 export default GlobalLocationTracker;
