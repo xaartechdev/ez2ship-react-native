@@ -26,7 +26,9 @@ class LocationTrackingDebug {
       console.log('🐛 Location Tracking Debug:', {
         timestamp: new Date().toISOString(),
         isTracking: status.isTracking,
-        orderId: status.orderId,
+        activeOrderIds: status.activeOrderIds,
+        orderCount: status.orderCount,
+        activeOrdersDisplay: status.activeOrderIds.join(', ') || 'None',
       });
     }, 15000); // Log every 15 seconds
   }
@@ -52,7 +54,9 @@ class LocationTrackingDebug {
     return {
       timestamp: new Date().toISOString(),
       isTracking: status.isTracking,
-      orderId: status.orderId,
+      activeOrderIds: status.activeOrderIds,
+      orderCount: status.orderCount,
+      activeOrdersDisplay: status.activeOrderIds.join(', ') || 'None',
     };
   }
 

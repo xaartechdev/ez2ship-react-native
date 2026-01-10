@@ -4,6 +4,7 @@ import tasksSlice from './slices/tasksSlice';
 import ordersSlice from './slices/ordersSlice';
 import notificationsSlice from './slices/notificationsSlice';
 import profileSlice from './slices/profileSlice';
+import locationTrackingSlice from './slices/locationTrackingSlice';
 
 const store = configureStore({
   reducer: {
@@ -12,6 +13,7 @@ const store = configureStore({
     orders: ordersSlice,
     notifications: notificationsSlice,
     profile: profileSlice,
+    locationTracking: locationTrackingSlice,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

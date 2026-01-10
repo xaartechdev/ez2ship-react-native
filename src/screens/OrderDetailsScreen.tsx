@@ -12,11 +12,13 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSelector, useDispatch } from 'react-redux';
 import {orderService} from '../services/orderService';
 import { launchImageLibrary, launchCamera, ImagePickerResponse, MediaType, CameraOptions, ImageLibraryOptions } from 'react-native-image-picker';
 import DocumentPicker from '@react-native-documents/picker';
 import TrackingStatus from '../components/TrackingStatus';
 import { useAutoLocationTracking } from '../hooks/useAutoLocationTracking';
+import { selectActiveOrderIds, selectActiveOrderCount } from '../store/slices/locationTrackingSlice';
 
 interface Task {
   id: number;
@@ -56,8 +58,13 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   
-  // Auto location tracking based on order status
-  useAutoLocationTracking({
+  // Redux state
+  const dispatch = useDispatch();
+  const activeOrderIds = useSelector(selectActiveOrderIds);
+  const activeOrderCount = useSelector(selectActiveOrderCount);
+  
+  // Auto location tracking based on order status - now with multiple order support
+  const { isTracking, activeOrderCount: hookActiveOrderCount } = useAutoLocationTracking({
     orderId: task.id.toString(), // Use id field for API, not order_id
     status: task.status,
     live_tracking_enabled: task.live_tracking_enabled ? 1 : 0,
@@ -188,8 +195,9 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
           });
           setTask({...task, status: 'in_transit'});
           
-          // Location tracking will be automatically started by the app-level hook
-          console.log('🚀 Order status changed to in_transit, location tracking will start automatically...');
+          // Location tracking will be automatically started by the global location tracking system
+          console.log(`🚀 Order ${task.id} status changed to in_transit, will be added to global location tracking automatically...`);
+          console.log(`📍 Current active tracking orders: ${activeOrderCount} total`);
           break;
         case 'in_progress':
         case 'picked_up':
@@ -251,8 +259,9 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
             console.log('✅ Document upload completed successfully');
             setTask({...task, status: 'delivered'});
             
-            // Location tracking will be automatically stopped by the app-level hook
-            console.log('🛑 Order completed, location tracking will stop automatically...');
+            // Location tracking will be automatically stopped by the global tracking system
+            console.log(`🛑 Order ${task.id} completed, will be removed from global location tracking automatically...`);
+            console.log(`📍 Remaining active tracking orders: ${Math.max(0, activeOrderCount - 1)} (estimated)`);
           } catch (docError) {
             console.error('❌ Failed to upload documents:', docError);
             Alert.alert(
@@ -569,7 +578,17 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
 
       {/* Tracking Status - Show when order is in transit */}
       {task.status === 'in_transit' && (
-        <TrackingStatus />
+        <View>
+          <TrackingStatus />
+          {/* Global tracking status indicator */}
+          {activeOrderCount > 1 && (
+            <View style={styles.multiOrderTrackingIndicator}>
+              <Text style={styles.multiOrderTrackingText}>
+                📍 Tracking {activeOrderCount} orders simultaneously
+              </Text>
+            </View>
+          )}
+        </View>
       )}
 
       {/* Content */}
@@ -1533,6 +1552,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginLeft: 8,
+  },
+  multiOrderTrackingIndicator: {
+    backgroundColor: '#E3F2FD',
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 8,
+  },
+  multiOrderTrackingText: {
+    fontSize: 14,
+    color: '#1565C0',
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });
 
