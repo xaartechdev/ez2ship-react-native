@@ -3,6 +3,10 @@ import { tasksService, Task, TasksResponse } from '../../services/tasksService';
 
 export interface TasksState {
   tasks: Task[];
+  // Add cached tasks by status for location tracking
+  pendingTasks: Task[];
+  inProgressTasks: Task[];
+  completedTasks: Task[];
   isLoading: boolean;
   isLoadingMore: boolean;
   error: string | null;
@@ -42,6 +46,27 @@ export const fetchTasks = createAsyncThunk(
       return { ...response, isLoadMore: params.loadMore || false };
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch tasks');
+    }
+  }
+);
+
+// Background fetch for location tracking - doesn't affect UI loading state
+export const fetchTasksForLocationTracking = createAsyncThunk(
+  'tasks/fetchTasksForLocationTracking',
+  async (status: 'pending' | 'in_progress' | 'completed', { rejectWithValue }) => {
+    try {
+      console.log(`🔍 Background fetching ${status} tasks for location tracking...`);
+      const response = await tasksService.getTasks({ status, per_page: 100 });
+      
+      if (!response.success) {
+        return rejectWithValue(response.message);
+      }
+      
+      console.log(`✅ Fetched ${response.data?.tasks?.length || 0} ${status} tasks for tracking`);
+      return { ...response, status };
+    } catch (error: any) {
+      console.error(`❌ Failed to fetch ${status} tasks for tracking:`, error);
+      return rejectWithValue(error.message || `Failed to fetch ${status} tasks`);
     }
   }
 );
@@ -134,6 +159,10 @@ export const updateTaskStatus = createAsyncThunk(
 
 const initialState: TasksState = {
   tasks: [],
+  // Initialize cached task arrays for location tracking
+  pendingTasks: [],
+  inProgressTasks: [],
+  completedTasks: [],
   isLoading: false,
   isLoadingMore: false,
   error: null,
@@ -197,6 +226,8 @@ const tasksSlice = createSlice({
       })
       .addCase(fetchTasks.fulfilled, (state, action) => {
         const { isLoadMore, ...response } = action.payload as any;
+        const requestStatus = (action.meta.arg as any)?.status;
+        
         state.isLoading = false;
         state.isLoadingMore = false;
         
@@ -207,6 +238,15 @@ const tasksSlice = createSlice({
           } else {
             // Replace tasks for fresh load
             state.tasks = response.data.tasks;
+          }
+          
+          // CACHE TASKS BY STATUS for location tracking persistence
+          if (requestStatus === 'pending') {
+            state.pendingTasks = response.data.tasks;
+          } else if (requestStatus === 'in_progress') {
+            state.inProgressTasks = response.data.tasks;
+          } else if (requestStatus === 'completed') {
+            state.completedTasks = response.data.tasks;
           }
           
           state.pagination = {
@@ -225,6 +265,31 @@ const tasksSlice = createSlice({
         state.isLoading = false;
         state.isLoadingMore = false;
         state.error = action.payload as string;
+      });
+
+    // Background fetch for location tracking
+    builder
+      .addCase(fetchTasksForLocationTracking.fulfilled, (state, action) => {
+        const response = action.payload as any;
+        const status = response.status;
+        
+        if (response.data) {
+          // Cache tasks by status for location tracking - don't affect current UI
+          if (status === 'pending') {
+            state.pendingTasks = response.data.tasks;
+            console.log(`📦 Cached ${response.data.tasks.length} pending tasks for tracking`);
+          } else if (status === 'in_progress') {
+            state.inProgressTasks = response.data.tasks;
+            console.log(`📦 Cached ${response.data.tasks.length} in-progress tasks for tracking`);
+          } else if (status === 'completed') {
+            state.completedTasks = response.data.tasks;
+            console.log(`📦 Cached ${response.data.tasks.length} completed tasks for tracking`);
+          }
+        }
+      })
+      .addCase(fetchTasksForLocationTracking.rejected, (state, action) => {
+        console.error('❌ Background task fetch failed:', action.payload);
+        // Don't set UI error state for background operations
       });
 
     // Fetch Task Details
