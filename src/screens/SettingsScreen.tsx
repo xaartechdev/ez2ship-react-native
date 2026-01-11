@@ -164,7 +164,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
             <Text style={styles.settingArrow}>›</Text>
           </TouchableOpacity>
 
-          {/* Location Test Option (Debug) */}
+          {/* Location Test Option (Debug)
           <TouchableOpacity 
             style={styles.settingItem} 
             onPress={() => navigation.navigate('LocationTest')}
@@ -177,7 +177,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
               <Text style={styles.settingSubtitle}>Debug GPS functionality</Text>
             </View>
             <Text style={styles.settingArrow}>›</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           {/* Logout Option */}
           <TouchableOpacity style={styles.settingItem} onPress={handleLogout}>
