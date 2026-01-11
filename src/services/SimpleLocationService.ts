@@ -5,6 +5,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Geolocation from 'react-native-geolocation-service';
 import { PermissionsAndroid, Platform } from 'react-native';
+import { API_CONFIG } from '../config/api';
+
 
 class SimpleLocationService {
   private static instance: SimpleLocationService;
@@ -39,7 +41,6 @@ class SimpleLocationService {
       const result = await Geolocation.requestAuthorization('whenInUse');
       return result === 'granted';
     } catch (error) {
-      console.error('Permission request error:', error);
       return false;
     }
   }
@@ -57,12 +58,9 @@ class SimpleLocationService {
             accuracy: position.coords.accuracy,
           };
           
-          console.log(`📍 Raw GPS data: Lat ${location.latitude}, Lng ${location.longitude}, Accuracy: ${location.accuracy}m`);
-          
           resolve(location);
         },
         (error) => {
-          console.error('Location error:', error);
           resolve(null);
         },
         {
@@ -81,7 +79,6 @@ class SimpleLocationService {
   private isLocationValid(newLocation: { latitude: number; longitude: number; accuracy?: number }): boolean {
     // Check accuracy
     if (newLocation.accuracy && newLocation.accuracy > this.MIN_ACCURACY) {
-      console.log(`⚠️ Location accuracy too low: ${newLocation.accuracy}m (min: ${this.MIN_ACCURACY}m)`);
       return false;
     }
 
@@ -95,7 +92,6 @@ class SimpleLocationService {
       );
 
       if (distance < this.MIN_DISTANCE) {
-        console.log(`📍 Location change too small: ${distance}m (min: ${this.MIN_DISTANCE}m)`);
         return false;
       }
     }
@@ -125,55 +121,22 @@ class SimpleLocationService {
    * Send location to API with order_id (supports multiple order IDs as comma-separated string)
    */
   async sendLocationToAPI(latitude: number, longitude: number, orderId?: string): Promise<boolean> {
-    console.log('🎯 ENTERING sendLocationToAPI function');
-    console.log('🎯 Function parameters:', { latitude, longitude, orderId });
-    console.log('🎯 Active order IDs in service:', Array.from(this.activeOrderIds));
-    console.log('🎯 Timestamp:', new Date().toISOString());
-    
     try {
-      console.log('🎯 Retrieving auth token from AsyncStorage...');
       const authToken = await AsyncStorage.getItem('auth_token');
-      console.log('🎯 Auth token retrieved:', authToken ? 'Present' : 'Missing');
-      console.log('🎯 Auth token retrieved:', authToken ? 'Present' : 'Missing');
       
-      console.log('🎯 Determining order IDs to send...');
       // Determine order IDs to send
       let orderIdsToSend: string;
       if (orderId) {
         // If specific orderId provided, use it
-        console.log('🎯 Using provided orderId:', orderId);
         orderIdsToSend = orderId;
       } else if (this.activeOrderIds.size > 0) {
         // Use all active order IDs as comma-separated string
         orderIdsToSend = Array.from(this.activeOrderIds).join(',');
-        console.log('🎯 Using active order IDs:', orderIdsToSend);
       } else {
-        console.error('🎯 ❌ NO ORDER IDS AVAILABLE!');
-        console.error('🎯 ❌ Service activeOrderIds size:', this.activeOrderIds.size);
-        console.error('🎯 ❌ Service activeOrderIds content:', Array.from(this.activeOrderIds));
-        console.error('🎯 ❌ Provided orderId parameter:', orderId);
-        console.error('🎯 ❌ This should NOT happen with the new implementation!');
-        
-        // Log the full function call context
-        console.error('🎯 ❌ FULL CONTEXT DEBUG:');
-        console.error('🎯 ❌ Function params:', { latitude, longitude, orderId });
-        console.error('🎯 ❌ Service state:', {
-          isTracking: this.isTracking,
-          activeOrderIdsSize: this.activeOrderIds.size,
-          activeOrderIdsArray: Array.from(this.activeOrderIds)
-        });
-        
-        console.warn('⚠️ No order ID available for location tracking');
-        
         // EMERGENCY FIX: Return success with dummy data instead of failing
-        console.log('🚨 EMERGENCY: Proceeding with dummy order ID for testing');
         orderIdsToSend = 'emergency-test-order';
-        
-        // Also try to continue instead of returning false
-        // return false;
       }
-      console.log('🎯 Final orderIdsToSend:', orderIdsToSend);
-      console.log(`📍 Preparing to send location for Order IDs: ${orderIdsToSend}`);
+      
       // Update last location
       this.lastLocation = {
         latitude,
@@ -187,22 +150,8 @@ class SimpleLocationService {
         longitude: parseFloat(longitude.toFixed(7)),
       };
       
-      // Enhanced API Request Logging
-      console.log('🚀 LOCATION API CALL - REQUEST DETAILS:');
-      console.log('📤 URL:', 'https://devez2ship.xaartech.com/api/driver/tracking/update-location');
-      console.log('📤 Method:', 'POST');
-      console.log('📤 Payload:', JSON.stringify(payload, null, 2));
-      console.log('📤 Active Order IDs:', Array.from(this.activeOrderIds));
-      console.log('📤 Order Count:', this.activeOrderIds.size);
-      console.log('📤 Auth Token Present:', !!authToken);
-      console.log('📤 Auth Token Preview:', authToken ? `Bearer ${authToken.substring(0, 15)}...${authToken.substring(authToken.length - 5)}` : 'No token');
-      console.log('📤 Timestamp:', new Date().toISOString());
-      console.log('📤 Headers:', {
-        'Content-Type': 'application/json',
-        'Authorization': authToken ? `Bearer ${authToken.substring(0, 15)}...` : 'No token'
-      });
-
-      const response = await fetch('https://devez2ship.xaartech.com/api/driver/tracking/update-location', {
+      const endpoint = API_CONFIG.BASE_URL+'/driver/tracking/update-location' || 'https://devez2ship.xaartech.com/api/driver/tracking/update-location';
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -214,51 +163,8 @@ class SimpleLocationService {
       const success = response.ok;
       const responseData = await response.text();
       
-      // Enhanced API Response Logging
-      console.log('🏁 LOCATION API CALL - RESPONSE DETAILS:');
-      console.log('📥 Response Status:', response.status);
-      console.log('📥 Response Status Text:', response.statusText);
-      console.log('📥 Response OK:', response.ok);
-      console.log('📥 Response Success:', success);
-      console.log('📥 Response Headers:', Object.fromEntries(response.headers.entries()));
-      console.log('📥 Response Data Length:', responseData ? responseData.length : 0);
-      console.log('📥 Response Timestamp:', new Date().toISOString());
-      
-      if (responseData) {
-        console.log('📥 Full Response Data:', responseData);
-        try {
-          const jsonData = JSON.parse(responseData);
-          console.log('📥 Parsed JSON Response:', JSON.stringify(jsonData, null, 2));
-        } catch (e) {
-          console.log('📥 Response is not JSON format');
-        }
-      } else {
-        console.log('📥 No response data received');
-      }
-      
-      if (success) {
-        console.log('✅ LOCATION API SUCCESS - Data sent successfully for orders:', Array.from(this.activeOrderIds).join(', '));
-        try {
-          const jsonData = JSON.parse(responseData);
-          console.log('✅ Success Response Data:', jsonData);
-        } catch (e) {
-          console.log('✅ Success with non-JSON response');
-        }
-      } else {
-        console.error('❌ LOCATION API FAILED:');
-        console.error('❌ Status Code:', response.status);
-        console.error('❌ Error Response:', responseData);
-        console.error('❌ Failed for orders:', Array.from(this.activeOrderIds).join(', '));
-      }
-      
       return success;
     } catch (error) {
-      console.error('🎯 ❌ CAUGHT ERROR in sendLocationToAPI:');
-      console.error('🎯 ❌ Error details:', error);
-      console.error('🎯 ❌ Error message:', error.message);
-      console.error('🎯 ❌ Error stack:', error.stack);
-      console.error('🎯 ❌ Function parameters were:', { latitude, longitude, orderId });
-      console.error('API Error:', error);
       return false;
     }
   }
@@ -268,17 +174,14 @@ class SimpleLocationService {
    */
   async startTrackingForOrder(orderId: string): Promise<void> {
     if (this.activeOrderIds.has(orderId)) {
-      console.log(`⚠️ Already tracking for order ${orderId}`);
       return;
     }
 
     const hasPermission = await this.requestPermissions();
     if (!hasPermission) {
-      console.error('❌ Location permission denied');
       return;
     }
 
-    console.log(`🚀 Adding order ${orderId} to location tracking...`);
     this.activeOrderIds.add(orderId);
     
     // Start tracking if not already started
@@ -294,7 +197,6 @@ class SimpleLocationService {
       // Set up interval tracking (every 5 seconds)
       this.trackingIntervalId = setInterval(async () => {
         if (this.activeOrderIds.size === 0) {
-          console.log('⚠️ No active orders, stopping tracking interval');
           this.stopTracking();
           return;
         }
@@ -303,15 +205,10 @@ class SimpleLocationService {
         if (location) {
           // Check if location is accurate and significantly different
           if (this.isLocationValid(location)) {
-            console.log(`✅ Location passed validation, sending to API for ${this.activeOrderIds.size} active orders`);
             await this.sendLocationToAPI(location.latitude, location.longitude);
-          } else {
-            console.log(`⚠️ Location filtered out due to poor accuracy or minimal movement`);
           }
         }
       }, 5000);
-
-      console.log('✅ Location tracking started with 5-second intervals');
     } else {
       // Just send initial location for new order if tracking already active
       const initialLocation = await this.getCurrentLocation();
@@ -319,8 +216,6 @@ class SimpleLocationService {
         await this.sendLocationToAPI(initialLocation.latitude, initialLocation.longitude);
       }
     }
-
-    console.log(`✅ Order ${orderId} added to tracking. Active orders: [${Array.from(this.activeOrderIds).join(', ')}]`);
   }
 
   /**
@@ -328,14 +223,10 @@ class SimpleLocationService {
    */
   stopTrackingForOrder(orderId: string): void {
     if (!this.activeOrderIds.has(orderId)) {
-      console.log(`⚠️ Order ${orderId} is not being tracked`);
       return;
     }
 
-    console.log(`🛑 Removing order ${orderId} from location tracking...`);
     this.activeOrderIds.delete(orderId);
-    
-    console.log(`✅ Order ${orderId} removed from tracking. Remaining active orders: [${Array.from(this.activeOrderIds).join(', ')}]`);
     
     // Stop tracking completely if no active orders
     if (this.activeOrderIds.size === 0) {
@@ -348,7 +239,6 @@ class SimpleLocationService {
    */
   async startTracking(): Promise<void> {
     if (this.activeOrderIds.size === 0) {
-      console.warn('⚠️ No active order IDs set for tracking');
       return;
     }
     // Tracking will be managed by startTrackingForOrder method
@@ -359,12 +249,9 @@ class SimpleLocationService {
    */
   stopTracking(): void {
     if (!this.isTracking) {
-      console.log('📍 Location tracking not active');
       return;
     }
 
-    console.log(`🛑 Stopping location tracking for all orders: [${Array.from(this.activeOrderIds).join(', ')}]`);
-    
     if (this.watchId !== null) {
       Geolocation.clearWatch(this.watchId);
       this.watchId = null;
@@ -378,7 +265,25 @@ class SimpleLocationService {
     this.isTracking = false;
     this.activeOrderIds.clear();
     this.lastLocation = null;
-    console.log('✅ Location tracking stopped for all orders');
+  }
+
+  /**
+   * Force stop and clear all tracking data (useful for logout scenarios)
+   */
+  forceStopTracking(): void {
+    if (this.watchId !== null) {
+      Geolocation.clearWatch(this.watchId);
+      this.watchId = null;
+    }
+
+    if (this.trackingIntervalId !== null) {
+      clearInterval(this.trackingIntervalId);
+      this.trackingIntervalId = null;
+    }
+    
+    this.isTracking = false;
+    this.activeOrderIds.clear();
+    this.lastLocation = null;
   }
 
   /**
@@ -428,17 +333,14 @@ class SimpleLocationService {
       case 'high':
         this.MIN_ACCURACY = 20; // 20 meters
         this.MIN_DISTANCE = 3;  // 3 meters
-        console.log('🎯 High precision mode: MIN_ACCURACY=20m, MIN_DISTANCE=3m');
         break;
       case 'balanced':
         this.MIN_ACCURACY = 50; // 50 meters
         this.MIN_DISTANCE = 5;  // 5 meters
-        console.log('⚖️ Balanced mode: MIN_ACCURACY=50m, MIN_DISTANCE=5m');
         break;
       case 'low':
         this.MIN_ACCURACY = 100; // 100 meters
         this.MIN_DISTANCE = 10;  // 10 meters
-        console.log('🔋 Battery saving mode: MIN_ACCURACY=100m, MIN_DISTANCE=10m');
         break;
     }
   }
@@ -447,15 +349,10 @@ class SimpleLocationService {
    * Test the service by getting location once and sending to API
    */
   async testService(orderId?: string): Promise<void> {
-    console.log('🧪 Testing Simple Location Service...');
-    
     const location = await this.getCurrentLocation();
     if (location) {
-      console.log(`📍 Got location: ${location.latitude}, ${location.longitude}`);
       const testOrderId = orderId || (this.activeOrderIds.size > 0 ? Array.from(this.activeOrderIds)[0] : 'test-order');
       await this.sendLocationToAPI(location.latitude, location.longitude, testOrderId);
-    } else {
-      console.log('❌ Failed to get location');
     }
   }
 

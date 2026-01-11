@@ -38,9 +38,13 @@ export const useGlobalAutoLocationTracker = () => {
 
   // Initialize by fetching in-progress tasks for location tracking
   useEffect(() => {
-    // Reset initialization flag when user logs out
+    // Reset initialization flag when user logs out and stop tracking
     if (!isAuthenticated) {
       hasInitializedRef.current = false;
+      if (isGlobalTrackingRef.current) {
+        console.log('🚪 GLOBAL AUTO-TRACKER: User logged out - stopping all location tracking');
+        stopGlobalTracking();
+      }
       return;
     }
     

@@ -174,6 +174,12 @@ class AuthService {
 
   async logout(): Promise<{ success: boolean; message: string }> {
     try {
+      // Stop location tracking before logout
+      const SimpleLocationService = (await import('./SimpleLocationService')).default;
+      const locationService = SimpleLocationService.getInstance();
+      locationService.forceStopTracking();
+      console.log('✅ Location tracking force stopped during logout');
+      
       // Call logout endpoint
       await apiClient.logout();
       
@@ -197,6 +203,12 @@ class AuthService {
 
   async forceLogout(): Promise<{ success: boolean; message: string }> {
     try {
+      // Stop location tracking before force logout
+      const SimpleLocationService = (await import('./SimpleLocationService')).default;
+      const locationService = SimpleLocationService.getInstance();
+      locationService.forceStopTracking();
+      console.log('✅ Location tracking force stopped during force logout');
+      
       // Force logout without API call (for invalid token scenarios)
       await this.clearAuthData();
       
