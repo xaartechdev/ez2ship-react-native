@@ -30,8 +30,23 @@ const locationTrackingSlice = createSlice({
     addActiveOrder: (state, action: PayloadAction<{ orderId: string; status: string; live_tracking_enabled: boolean }>) => {
       const { orderId, status, live_tracking_enabled } = action.payload;
       
-      // Remove existing entry if it exists
-      state.activeOrders = state.activeOrders.filter(order => order.orderId !== orderId);
+      // Check if already exists to prevent unnecessary updates
+      const existingOrderIndex = state.activeOrders.findIndex(order => order.orderId === orderId);
+      
+      if (existingOrderIndex >= 0) {
+        // Update existing entry if status changed
+        const existingOrder = state.activeOrders[existingOrderIndex];
+        if (existingOrder.status !== status || existingOrder.live_tracking_enabled !== live_tracking_enabled) {
+          state.activeOrders[existingOrderIndex] = {
+            ...existingOrder,
+            status,
+            live_tracking_enabled,
+          };
+          console.log(`📍 Updated existing order ${orderId} in tracking list. Status: ${status}`);
+        }
+        // If nothing changed, don't modify state
+        return;
+      }
       
       // Add new entry
       state.activeOrders.push({

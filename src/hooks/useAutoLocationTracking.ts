@@ -37,13 +37,22 @@ export const useAutoLocationTracking = (config: TrackingConfig) => {
   // Stable reference for activeOrderIds to prevent infinite re-renders
   const stableActiveOrderIds = useMemo(() => activeOrderIds, [JSON.stringify(activeOrderIds.sort())]);
 
+  // Separate ref to track the last processed config to prevent unnecessary updates
+  const lastConfigRef = useRef<string>('');
+  const currentConfigStr = `${config.orderId}-${config.status}-${config.live_tracking_enabled}`;
+
   useEffect(() => {
+    // Prevent processing the same config multiple times
+    if (lastConfigRef.current === currentConfigStr) {
+      return;
+    }
+    lastConfigRef.current = currentConfigStr;
+
     // Check if we should start/stop tracking for this specific order
     const trackingStatuses = ['in_progress', 'picked_up', 'in_transit'];
     const liveTrackingValue = config.live_tracking_enabled === 1 || config.live_tracking_enabled === true;
     const shouldTrack = trackingStatuses.includes(config.status) && liveTrackingValue;
-    const isCurrentlyInActiveList = stableActiveOrderIds.includes(config.orderId);
-
+    const isCurrentlyInActiveList = activeOrderIds.includes(config.orderId); // Use activeOrderIds directly
 
     if (shouldTrack && !isCurrentlyInActiveList) {
       // Add this order to active tracking
@@ -58,7 +67,7 @@ export const useAutoLocationTracking = (config: TrackingConfig) => {
       locationService.startTrackingForOrder(config.orderId);
     } else if (!shouldTrack && isCurrentlyInActiveList) {
       // Remove this order from active tracking
-      
+      console.log(`🛑 Removing order ${config.orderId} from active tracking list`);
       dispatch(removeActiveOrder(config.orderId));
       
       // Stop location service for this order
@@ -71,28 +80,29 @@ export const useAutoLocationTracking = (config: TrackingConfig) => {
     return () => {
       // Don't cleanup on unmount - let the global state manage lifecycle
     };
-  }, [config.status, config.live_tracking_enabled, config.orderId, JSON.stringify(stableActiveOrderIds)]);
+  }, [config.status, config.live_tracking_enabled, config.orderId]); // Remove stableActiveOrderIds dependency
 
   // Effect to manage global location tracking based on active orders
   useEffect(() => {    
+    // Use a stable value and prevent rapid changes
+    const currentActiveCount = stableActiveOrderIds.length;
     
-    if (stableActiveOrderIds.length > 0 && !isGlobalTrackingRef.current) {
-      console.log(`🌍 Starting global location tracking for ${stableActiveOrderIds.length} orders: [${stableActiveOrderIds.join(', ')}]`);
+    if (currentActiveCount > 0 && !isGlobalTrackingRef.current) {
+      console.log(`🌍 Starting global location tracking for ${currentActiveCount} orders: [${stableActiveOrderIds.join(', ')}]`);
       startGlobalTracking();
-    } else if (stableActiveOrderIds.length === 0 && isGlobalTrackingRef.current) {
+    } else if (currentActiveCount === 0 && isGlobalTrackingRef.current) {
       console.log(`🌍 Stopping global location tracking - no active orders`);
       stopGlobalTracking();
-    } else if (stableActiveOrderIds.length > 0 && isGlobalTrackingRef.current) {
-      
+    } else if (currentActiveCount > 0 && isGlobalTrackingRef.current) {
       // Ensure service has all active orders
       stableActiveOrderIds.forEach(async (orderId) => {
         if (!locationService.isOrderBeingTracked(orderId)) {
-        
+          console.log(`🔧 Adding missing order ${orderId} to location service`);
           await locationService.startTrackingForOrder(orderId);
         }
       });
     }
-  }, [stableActiveOrderIds.length, JSON.stringify(stableActiveOrderIds)]);
+  }, [stableActiveOrderIds.length]); // Only depend on length, not full array
 
   const startGlobalTracking = async () => {
     try {

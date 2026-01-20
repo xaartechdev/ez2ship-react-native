@@ -878,45 +878,7 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
         )}
 
         {/* Proof of Delivery Section - Show after arrived at destination */}
-        {(task.status === 'arrived' || task.status === 'arrived_at_destination') && (
-          <View style={styles.deliverySection}>
-            <View style={styles.deliverySectionHeader}>
-              <Text style={styles.deliverySectionIcon}>📎</Text>
-              <Text style={styles.deliverySectionTitle}>Proof of Delivery Documents</Text>
-            </View>
-
-            <TouchableOpacity
-              style={[
-                styles.uploadButton,
-                proofUploaded && styles.uploadButtonUploaded
-              ]}
-              onPress={handleUploadProof}
-            >
-              <Text style={styles.uploadButtonIcon}>
-                {proofUploaded ? '✓' : '📤'}
-              </Text>
-              <Text style={styles.uploadButtonText}>
-                {proofUploaded ? 'Document Uploaded' : 'Upload Document'}
-              </Text>
-            </TouchableOpacity>
-
-            <Text style={styles.uploadHelpText}>
-              Upload delivery receipts, photos, or other proof of delivery documents
-            </Text>
-
-            {/* {!otpVerified && (
-              <TouchableOpacity
-                style={styles.completeDeliveryButtonDisabled}
-                disabled={true}
-              >
-                <Text style={styles.completeDeliveryButtonDisabledText}>
-                  Complete Delivery
-                </Text>
-              </TouchableOpacity>
-            )} */}
-          </View>
-        )}
-
+      
         {/* Delivery Notes Section */}
         {(task.status === 'arrived' || task.status === 'arrived_at_destination') && (
           <View style={styles.deliverySection}>

@@ -257,24 +257,7 @@ const MyTasksScreen: React.FC<MyTasksScreenProps> = ({ navigation }) => {
       </View>
 
       {/* Compact Summary Row */}
-      <View style={styles.summaryRow}>
-        <View style={styles.summaryBox}>
-          <Text style={styles.summaryCount}>{pendingCount}</Text>
-          <Text style={styles.summaryText}>Pending</Text>
-        </View>
-        <View style={styles.summaryBox}>
-          <Text style={[styles.summaryCount, { color: '#007AFF' }]}>
-            {inProgressCount}
-          </Text>
-          <Text style={styles.summaryText}>In Progress</Text>
-        </View>
-        <View style={styles.summaryBox}>
-          <Text style={[styles.summaryCount, { color: '#34C759' }]}>
-            {completedCount}
-          </Text>
-          <Text style={styles.summaryText}>Completed</Text>
-        </View>
-      </View>
+  
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
