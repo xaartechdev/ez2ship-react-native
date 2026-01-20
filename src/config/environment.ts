@@ -9,7 +9,7 @@ export const ENV = {
   
   // App Configuration
   APP_VERSION: '1.0.0',
-  APP_NAME: 'EZ2Ship Driver',
+  APP_NAME: 'EZ 2 SHIP Driver',
   
   // Environment
   ENVIRONMENT: __DEV__ ? 'development' : 'production',

@@ -22,7 +22,7 @@ const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
           <Logo width={120} height={120} />
         </View>
         
-        <Text style={styles.appName}>Ez2ship Driver</Text>
+        <Text style={styles.appName}>EZ 2 SHIP Driver</Text>
         <Text style={styles.subtitle}>Loading your experience</Text>
         
         <View style={styles.loadingContainer}>
