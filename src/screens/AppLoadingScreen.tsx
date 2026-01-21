@@ -4,9 +4,10 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Logo } from '../assets/images/Logo';
+import logo from '../assets/images/logo.png';
 
 interface AppLoadingScreenProps {
   message?: string;
@@ -19,7 +20,7 @@ const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.logoContainer}>
-          <Logo width={120} height={120} />
+          <Image source={logo} style={{ width: 120, height: 120 }} resizeMode="contain" />
         </View>
         
         <Text style={styles.appName}>Ez2ship Driver</Text>
