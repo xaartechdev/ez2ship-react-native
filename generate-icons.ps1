@@ -3,7 +3,7 @@
 # Requires ImageMagick to be installed: https://imagemagick.org/
 
 param(
-    [string]$SourceLogo = "src\assets\images\ez2ship-logo.png"
+    [string]$SourceLogo = "src\assets\images\LOGO-SVG.svg"
 )
 
 # Function to check if ImageMagick is installed
@@ -20,8 +20,26 @@ function Test-ImageMagick {
 # Check if ImageMagick is installed
 if (-not (Test-ImageMagick)) {
     Write-Host "❌ ImageMagick is not installed. Please install it first:" -ForegroundColor Red
-    Write-Host "   Download from https://imagemagick.org/script/download.php#windows" -ForegroundColor Yellow
-    Write-Host "   Or use chocolatey: choco install imagemagick" -ForegroundColor Yellow
+    Write-Host "   1. Go to https://imagemagick.org/script/download.php#windows" -ForegroundColor Yellow
+    Write-Host "   2. Download 'ImageMagick-7.x.x-x-Q16-HDRI-x64-dll.exe'" -ForegroundColor Yellow
+    Write-Host "   3. Run the installer and make sure to check 'Install development headers and libraries for C and C++'" -ForegroundColor Yellow
+    Write-Host "   4. Add ImageMagick to your PATH environment variable" -ForegroundColor Yellow
+    Write-Host "   5. Restart PowerShell and run this script again" -ForegroundColor Yellow
+    Write-Host "" 
+    Write-Host "Alternative installation methods:" -ForegroundColor Cyan
+    Write-Host "   - Using Chocolatey: choco install imagemagick" -ForegroundColor Yellow  
+    Write-Host "   - Using Scoop: scoop install imagemagick" -ForegroundColor Yellow
+    Write-Host "   - Using winget: winget install ImageMagick.ImageMagick" -ForegroundColor Yellow
+    
+    # Try to open the download page
+    try {
+        Start-Process "https://imagemagick.org/script/download.php#windows"
+        Write-Host "✅ Opening ImageMagick download page in your browser..." -ForegroundColor Green
+    }
+    catch {
+        Write-Host "⚠️  Please manually visit: https://imagemagick.org/script/download.php#windows" -ForegroundColor Yellow
+    }
+    
     exit 1
 }
 

@@ -149,7 +149,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           </View>
 
           {/* App Title */}
-          <Text style={styles.title}>EZ 2 SHIP Driver</Text>
+          <Text style={styles.title}>EZ2SHIP Driver</Text>
           <Text style={styles.subtitle}>
             Welcome back! Please sign in to continue.
           </Text>
