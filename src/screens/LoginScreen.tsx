@@ -16,7 +16,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { login, clearError } from '../store/slices/authSlice';
 import { Button, Input, Loading } from '../components/common';
 import { ENV } from '../config/environment';
-import Logo from '../assets/images/logo.png';
+import Logo from '../assets/images/ez2ship-logo.png';
 
 interface LoginScreenProps {
   navigation: any;
