@@ -8,9 +8,10 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Logo } from '../assets/images/Logo';
+import logo from '../assets/images/logo.png';
 import { authService } from '../services/authService';
 
 interface ResetPasswordScreenProps {
@@ -94,7 +95,7 @@ const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ navigation })
 
       {/* App Logo */}
       <View style={styles.logoContainer}>
-        <Logo width={120} height={100} />
+        <Image source={logo} style={{ width: 120, height: 100 }} resizeMode="contain" />
       </View>
 
       {/* Title and Instructions */}

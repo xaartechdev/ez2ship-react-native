@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,7 +16,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { login, clearError } from '../store/slices/authSlice';
 import { Button, Input, Loading } from '../components/common';
 import { ENV } from '../config/environment';
-import { Logo } from '../assets/images/Logo';
+import Logo from '../assets/images/logo.png';
 
 interface LoginScreenProps {
   navigation: any;
@@ -140,7 +141,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         >
           {/* App Logo */}
           <View style={styles.logoContainer}>
-            <Logo width={140} height={110} />
+            <Image
+            source={Logo}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           </View>
 
           {/* App Title */}
@@ -269,6 +274,10 @@ const styles = StyleSheet.create({
     fontSize: ENV.FONT_SIZES.EXTRA_SMALL,
     color: ENV.COLORS.TEXT_MUTED,
   },
+  logo: {
+  width: 140,
+  height: 110,
+},
 });
 
 export default LoginScreen;
