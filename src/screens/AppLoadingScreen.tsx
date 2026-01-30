@@ -23,7 +23,7 @@ const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
           <Image source={logo} style={{ width: 120, height: 120 }} resizeMode="contain" />
         </View>
         
-        <Text style={styles.appName}>Ez2ship Driver</Text>
+        <Text style={styles.appName}>EZ 2 SHIP Driver</Text>
         <Text style={styles.subtitle}>Loading your experience</Text>
         
         <View style={styles.loadingContainer}>

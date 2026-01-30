@@ -11,8 +11,7 @@ export const LogoFallback: React.FC<LogoFallbackProps> = ({ width = 120, height 
     <View style={[styles.logoContainer, { width, height }]}>
       <View style={styles.logoContent}>
         <Text style={styles.logoText}>EZ</Text>
-        <Text style={styles.logoSubtext}>2 SHIP</Text>
-        <Text style={styles.logoLLC}>LLC</Text>
+        <Text style={styles.logoSubtext}>2SHIP</Text>
       </View>
     </View>
   );
@@ -49,12 +48,4 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginTop: -5,
   },
-  logoLLC: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: '#ff9500',
-    letterSpacing: 0.5,
-    marginTop: -2,
-  },
-});
 });

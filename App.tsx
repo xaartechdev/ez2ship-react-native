@@ -1,5 +1,5 @@
 /**
- * EZ2Ship Driver App
+ * EZ 2 SHIP Driver App
  * React Native Application
  *
  * @format
