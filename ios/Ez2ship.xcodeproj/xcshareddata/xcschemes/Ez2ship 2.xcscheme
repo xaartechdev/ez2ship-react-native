@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "myRApp.app"
+               BuildableName = "Ez2ship.app"
                BlueprintName = "Ez2ship"
                ReferencedContainer = "container:Ez2ship.xcodeproj">
             </BuildableReference>
@@ -45,7 +45,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "myRApp.app"
+            BuildableName = "Ez2ship.app"
             BlueprintName = "Ez2ship"
             ReferencedContainer = "container:Ez2ship.xcodeproj">
          </BuildableReference>
@@ -62,7 +62,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "myRApp.app"
+            BuildableName = "Ez2ship.app"
             BlueprintName = "Ez2ship"
             ReferencedContainer = "container:Ez2ship.xcodeproj">
          </BuildableReference>

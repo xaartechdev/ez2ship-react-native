@@ -563,6 +563,37 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
     );
   };
 
+const calculateDurationDays = (
+  scheduled_pickup: string,
+  delivery_date: string | null
+): number => {
+  if (!scheduled_pickup || !delivery_date) return 0;
+
+  const pickupDate = new Date(scheduled_pickup);
+  const deliveryDate = new Date(delivery_date);
+
+  if (isNaN(pickupDate.getTime()) || isNaN(deliveryDate.getTime())) return 0;
+
+  const pickupMidnight = new Date(
+    pickupDate.getFullYear(),
+    pickupDate.getMonth(),
+    pickupDate.getDate()
+  );
+
+  const deliveryMidnight = new Date(
+    deliveryDate.getFullYear(),
+    deliveryDate.getMonth(),
+    deliveryDate.getDate()
+  );
+
+  const diffTime =
+    deliveryMidnight.getTime() - pickupMidnight.getTime();
+
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
+
+
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -594,7 +625,7 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
       {/* Content */}
       <ScrollView style={styles.content}>
         {/* Show full order details for pending orders, simplified for others */}
-        {(task.status === 'pending' || task.status === 'assigned') ? (
+        {/* {(task.status === 'pending' || task.status === 'assigned') ? ( */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Order Details</Text>
             <View style={styles.detailsGrid}>
@@ -602,26 +633,23 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
                 <Text style={styles.detailLabel}>Customer</Text>
                 <Text style={styles.detailValue}>{task.customer_name}</Text>
               </View>
+              {/* <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Vehicle Type</Text>
+                <Text style={styles.detailValue}>{task.vehicle_type}</Text>
+              </View> */}
               <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Distance</Text>
+                <Text style={styles.detailValue}>
+                  {task?.distance  ? task.distance : '--'} miles
+                </Text>
+              </View>
+             <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>Vehicle Type</Text>
                 <Text style={styles.detailValue}>{task.vehicle_type}</Text>
               </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Distance</Text>
-                <Text style={styles.detailValue}>{task?.distance?.toFixed(1)} miles</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Duration</Text>
-                <Text style={styles.detailValue}>35 mins</Text>
-              </View>
             </View>
           </View>
-        ) : (
-          <View style={styles.simplifiedDetails}>
-            <Text style={styles.simplifiedDistance}>{task?.distance?.toFixed(1)} miles</Text>
-            <Text style={styles.simplifiedDuration}>35 mins</Text>
-          </View>
-        )}
+       
 
         {/* Scheduled Time with Call/Alert buttons */}
         <View style={styles.scheduledContainer}>
